@@ -38,7 +38,7 @@ const elements = {
     accountAvailable: document.getElementById('account-available'),
     accountMargin: document.getElementById('account-margin'),
     accountPnl: document.getElementById('account-pnl'),
-    positionsTable: document.getElementById('positions-table'),
+    positionsContainer: document.getElementById('positions-container'),
     positionCount: document.getElementById('position-count'),
     noPositions: document.getElementById('no-positions'),
     // 资产
@@ -386,7 +386,7 @@ function renderBalanceCard() {
 }
 
 /**
- * 渲染仓位表格
+ * 渲染仓位卡片
  */
 function renderPositionsTable() {
     let positions = [];
@@ -402,13 +402,19 @@ function renderPositionsTable() {
             }
         }
     } else {
-        positions = state.positions[state.currentAccountId] || [];
+        // 单账户模式下也添加账户名称
+        const account = state.accounts.find(a => a.id === state.currentAccountId);
+        const accountName = account ? account.name : state.currentAccountId;
+        positions = (state.positions[state.currentAccountId] || []).map(pos => ({
+            ...pos,
+            accountName
+        }));
     }
 
     elements.positionCount.textContent = `${positions.length} 个仓位`;
 
     if (positions.length === 0) {
-        elements.positionsTable.innerHTML = '';
+        elements.positionsContainer.innerHTML = '';
         elements.noPositions.classList.remove('hidden');
         return;
     }
@@ -420,38 +426,75 @@ function renderPositionsTable() {
         const isLong = pos.pos_side === 'long' || (pos.pos_side === 'net' && pos.pos > 0);
         const directionText = isLong ? '多' : '空';
         const directionClass = isLong ? 'text-profit' : 'text-loss';
-        const directionBgClass = isLong ? 'bg-profit/15' : 'bg-loss/15';
+        const directionBgClass = isLong ? 'bg-profit/20' : 'bg-loss/20';
+        const borderClass = isLong ? 'border-profit/30' : 'border-loss/30';
 
         const uplText = (pos.upl >= 0 ? '+' : '') + formatNumber(pos.upl);
         const uplClass = pos.upl >= 0 ? 'text-profit' : 'text-loss';
+        const uplGlow = pos.upl >= 0 ? 'glow-profit' : 'glow-loss';
 
-        const uplRatioText = (pos.upl_ratio * 100).toFixed(2) + '%';
+        const uplRatioText = (pos.upl_ratio >= 0 ? '+' : '') + (pos.upl_ratio * 100).toFixed(2) + '%';
         const uplRatioClass = pos.upl_ratio >= 0 ? 'text-profit' : 'text-loss';
 
-        const showAccountName = state.currentAccountId === null;
+        // 收益率进度条 (限制在 -100% 到 100% 范围)
+        const progressPercent = Math.min(Math.abs(pos.upl_ratio * 100), 100);
+        const progressColor = pos.upl_ratio >= 0 ? 'bg-profit' : 'bg-loss';
+
+        // 强平价显示
+        const liqPxText = pos.liq_px ? formatPrice(pos.liq_px) : '--';
 
         html += `
-            <tr class="table-row-hover">
-                <td class="px-6 py-4">
-                    <div class="font-mono text-sm font-medium">${pos.inst_id}</div>
-                    ${showAccountName ? `<div class="text-xs text-text-muted mt-1">${pos.accountName}</div>` : ''}
-                </td>
-                <td class="px-6 py-4">
-                    <span class="px-2.5 py-1 rounded-md text-xs font-medium ${directionClass} ${directionBgClass}">
-                        ${directionText}
-                    </span>
-                </td>
-                <td class="px-6 py-4 text-right font-mono text-sm">${Math.abs(pos.pos)}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm text-text-muted">${formatPrice(pos.avg_px)}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm">${formatPrice(pos.mark_px)}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm font-medium ${uplClass}">${uplText}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm font-medium ${uplRatioClass}">${uplRatioText}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm text-text-muted">${pos.lever}x</td>
-            </tr>
+            <div class="position-card bg-ios-elevated rounded-xl p-4 border ${borderClass} hover:bg-ios-surface transition-all">
+                <!-- 头部：合约名 + 方向 + 杠杆 -->
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-sm font-semibold text-text-primary">${pos.inst_id}</span>
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold ${directionClass} ${directionBgClass}">
+                            ${directionText}
+                        </span>
+                    </div>
+                    <span class="text-xs text-text-muted font-mono">${pos.lever}x</span>
+                </div>
+
+                <!-- 账户名称 -->
+                <div class="text-xs text-text-muted mb-3">${pos.accountName}</div>
+
+                <!-- 核心数据 -->
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-3 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">持仓</span>
+                        <span class="font-mono text-text-secondary">${Math.abs(pos.pos)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">开仓价</span>
+                        <span class="font-mono text-text-secondary">${formatPrice(pos.avg_px)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">标记价</span>
+                        <span class="font-mono text-text-primary">${formatPrice(pos.mark_px)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">强平价</span>
+                        <span class="font-mono text-loss/80">${liqPxText}</span>
+                    </div>
+                </div>
+
+                <!-- 盈亏区域 -->
+                <div class="pt-3 border-t border-ios-separator">
+                    <div class="flex items-baseline justify-between mb-2">
+                        <span class="text-3xl font-mono font-bold ${uplClass} ${uplGlow}">$${uplText}</span>
+                        <span class="text-sm font-mono font-semibold ${uplRatioClass}">${uplRatioText}</span>
+                    </div>
+                    <!-- 收益率进度条 -->
+                    <div class="h-1.5 bg-ios-surface rounded-full overflow-hidden">
+                        <div class="h-full ${progressColor} rounded-full transition-all" style="width: ${progressPercent}%"></div>
+                    </div>
+                </div>
+            </div>
         `;
     }
 
-    elements.positionsTable.innerHTML = html;
+    elements.positionsContainer.innerHTML = html;
 }
 
 /**
@@ -760,8 +803,25 @@ function renderPendingOrdersTable() {
         const posSideClass = isLong ? 'text-profit' : 'text-loss';
         const posSideBgClass = isLong ? 'bg-profit/15' : 'bg-loss/15';
 
+        // 检查是否有止盈止损
+        const hasSlTp = order.sl_trigger_px || order.tp_trigger_px;
+        
+        // 止损价格显示 (sl_ord_px 为 -1 表示市价)
+        let slPxText = '';
+        if (order.sl_trigger_px) {
+            const slOrdText = order.sl_ord_px === -1 ? '市价' : (order.sl_ord_px ? formatPrice(order.sl_ord_px) : '市价');
+            slPxText = `触发: ${formatPrice(order.sl_trigger_px)} → ${slOrdText}`;
+        }
+        
+        // 止盈价格显示 (tp_ord_px 为 -1 表示市价)
+        let tpPxText = '';
+        if (order.tp_trigger_px) {
+            const tpOrdText = order.tp_ord_px === -1 ? '市价' : (order.tp_ord_px ? formatPrice(order.tp_ord_px) : '市价');
+            tpPxText = `触发: ${formatPrice(order.tp_trigger_px)} → ${tpOrdText}`;
+        }
+
         html += `
-            <tr class="table-row-hover">
+            <tr class="table-row-hover border-b border-ios-separator">
                 <td class="px-6 py-3.5 text-sm">
                     ${timeStr}
                     ${showAccountName ? `<div class="text-xs text-text-muted mt-1">${order.accountName}</div>` : ''}
@@ -784,6 +844,26 @@ function renderPendingOrdersTable() {
                     <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
                 </td>
             </tr>
+            ${hasSlTp ? `
+            <tr class="bg-ios-surface/50">
+                <td colspan="9" class="px-6 py-2">
+                    <div class="flex items-center gap-6 text-xs">
+                        ${order.sl_trigger_px ? `
+                        <div class="flex items-center gap-2">
+                            <span class="px-1.5 py-0.5 rounded bg-loss/20 text-loss font-medium">止损</span>
+                            <span class="font-mono text-text-secondary">${slPxText}</span>
+                        </div>
+                        ` : ''}
+                        ${order.tp_trigger_px ? `
+                        <div class="flex items-center gap-2">
+                            <span class="px-1.5 py-0.5 rounded bg-profit/20 text-profit font-medium">止盈</span>
+                            <span class="font-mono text-text-secondary">${tpPxText}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+            ` : ''}
         `;
     }
 

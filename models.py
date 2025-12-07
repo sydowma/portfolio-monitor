@@ -115,6 +115,11 @@ class PendingOrder(BaseModel):
     avg_px: Optional[float] = None  # 成交均价
     state: str  # live/partially_filled
     lever: int = 1  # 杠杆倍数
+    # 止盈止损
+    sl_trigger_px: Optional[float] = None  # 止损触发价
+    sl_ord_px: Optional[float] = None  # 止损委托价 (-1 表示市价)
+    tp_trigger_px: Optional[float] = None  # 止盈触发价
+    tp_ord_px: Optional[float] = None  # 止盈委托价 (-1 表示市价)
     created_at: datetime
     updated_at: datetime
 

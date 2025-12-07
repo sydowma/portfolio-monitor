@@ -294,30 +294,14 @@
                         </div>
                     </div>
 
-                    <!-- 仓位表格 -->
+                    <!-- 仓位卡片 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
                         <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
                             <h3 class="text-xs text-text-muted uppercase tracking-wide">合约仓位</h3>
                             <span id="position-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个仓位</span>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="text-xs text-text-muted">
-                                    <tr class="border-b ios-separator">
-                                        <th class="text-left px-6 py-3.5 font-medium">合约</th>
-                                        <th class="text-left px-6 py-3.5 font-medium">方向</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">数量</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">开仓均价</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">标记价格</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">未实现盈亏</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">收益率</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">杠杆</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="positions-table" class="divide-y divide-ios-separator">
-                                    <!-- 动态生成 -->
-                                </tbody>
-                            </table>
+                        <div id="positions-container" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <!-- 动态生成卡片 -->
                         </div>
                         <div id="no-positions" class="hidden px-6 py-16 text-center text-text-muted text-sm">
                             <div class="text-4xl mb-4 opacity-50">📭</div>
@@ -385,7 +369,7 @@
                                         <th class="text-left px-6 py-3.5 font-medium">状态</th>
                                     </tr>
                                 </thead>
-                                <tbody id="pending-orders-table" class="divide-y divide-ios-separator">
+                                <tbody id="pending-orders-table">
                                     <!-- 动态生成 -->
                                 </tbody>
                             </table>

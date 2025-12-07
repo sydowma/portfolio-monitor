@@ -233,6 +233,16 @@ class OKXRestClient:
 
         orders = []
         for item in data:
+            # 解析止损价格 (-1 表示市价)
+            sl_ord_px = None
+            if item.get("slOrdPx"):
+                sl_ord_px = -1 if item.get("slOrdPx") == "-1" else float(item.get("slOrdPx"))
+            
+            # 解析止盈价格 (-1 表示市价)
+            tp_ord_px = None
+            if item.get("tpOrdPx"):
+                tp_ord_px = -1 if item.get("tpOrdPx") == "-1" else float(item.get("tpOrdPx"))
+
             orders.append(PendingOrder(
                 order_id=item.get("ordId", ""),
                 inst_id=item.get("instId", ""),
@@ -245,6 +255,10 @@ class OKXRestClient:
                 avg_px=float(item.get("avgPx", 0)) if item.get("avgPx") else None,
                 state=item.get("state", ""),
                 lever=int(item.get("lever", 1) or 1),
+                sl_trigger_px=float(item.get("slTriggerPx")) if item.get("slTriggerPx") else None,
+                sl_ord_px=sl_ord_px,
+                tp_trigger_px=float(item.get("tpTriggerPx")) if item.get("tpTriggerPx") else None,
+                tp_ord_px=tp_ord_px,
                 created_at=datetime.fromtimestamp(
                     int(item.get("cTime", 0)) / 1000, tz=timezone.utc
                 ),
