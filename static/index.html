@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=SF+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ios': {
+                            'bg': '#000000',
+                            'surface': '#1c1c1e',
+                            'elevated': '#2c2c2e',
+                            'separator': 'rgba(84, 84, 88, 0.65)',
+                        },
+                        'glass': {
+                            'bg': 'rgba(255, 255, 255, 0.05)',
+                            'border': 'rgba(255, 255, 255, 0.08)',
+                            'hover': 'rgba(255, 255, 255, 0.08)',
+                        },
+                        'accent': '#007AFF',
+                        'profit': '#34C759',
+                        'loss': '#FF3B30',
+                        'text': {
+                            'primary': '#ffffff',
+                            'secondary': '#ebebf5',
+                            'tertiary': '#ebebf599',
+                            'muted': '#8e8e93',
+                        }
+                    },
+                    fontFamily: {
+                        'sans': ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                        'mono': ['SF Mono', 'Monaco', 'Menlo', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* iOS 深色背景 */
+        body {
+            background: #000000;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 柔和的背景光晕 - Apple 风格 */
+        .bg-glow {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-glow-1 {
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(0, 122, 255, 0.08) 0%, transparent 70%);
+            top: -300px;
+            right: -200px;
+            animation: drift 30s ease-in-out infinite;
+        }
+
+        .bg-glow-2 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(88, 86, 214, 0.06) 0%, transparent 70%);
+            bottom: -200px;
+            left: -150px;
+            animation: drift 35s ease-in-out infinite reverse;
+        }
+
+        .bg-glow-3 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(175, 82, 222, 0.05) 0%, transparent 70%);
+            top: 40%;
+            left: 30%;
+            animation: drift 40s ease-in-out infinite;
+        }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(30px, -20px); }
+            50% { transform: translate(-15px, 25px); }
+            75% { transform: translate(-25px, -15px); }
+        }
+
+        /* iOS 玻璃效果 */
+        .glass {
+            background: rgba(28, 28, 30, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-light {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-hover {
+            transition: all 0.25s ease;
+        }
+
+        .glass-hover:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        /* iOS 风格按钮 */
+        .btn-ios {
+            background: #007AFF;
+            transition: all 0.2s ease;
+        }
+
+        .btn-ios:hover {
+            background: #0066d6;
+            transform: scale(0.98);
+        }
+
+        .btn-ios:active {
+            transform: scale(0.96);
+        }
+
+        /* 脉冲指示器 */
+        .pulse-dot {
+            animation: pulse-ios 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-ios {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* 淡入动画 */
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* iOS 风格滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+        /* 输入框样式 */
+        input[type="datetime-local"],
+        select {
+            color-scheme: dark;
+        }
+
+        /* 表格行悬浮 */
+        .table-row-hover {
+            transition: background-color 0.15s ease;
+        }
+
+        .table-row-hover:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* iOS 分隔线 */
+        .ios-separator {
+            border-color: rgba(84, 84, 88, 0.65);
+        }
+
+        /* 标签激活状态 */
+        .tab-active {
+            background: #007AFF;
+            color: white;
+        }
+
+        /* 柔和的文字发光 */
+        .glow-profit { text-shadow: 0 0 20px rgba(52, 199, 89, 0.3); }
+        .glow-loss { text-shadow: 0 0 20px rgba(255, 59, 48, 0.3); }
+    </style>
+</head>
+<body class="font-sans text-text-primary">
+    <!-- 背景光晕 -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+
+    <div id="app" class="relative z-10 flex h-screen">
+        <!-- 侧边栏 -->
+        <aside class="w-72 glass flex flex-col">
+            <!-- Logo -->
+            <div class="p-6 border-b ios-separator">
+                <h1 class="text-xl font-semibold text-text-primary">Portfolio Monitor</h1>
+                <p class="text-xs text-text-muted mt-2 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                    多账户实时监控
+                </p>
+            </div>
+
+            <!-- 连接状态 -->
+            <div class="px-6 py-4 border-b ios-separator flex items-center gap-3">
+                <span id="ws-status" class="w-2 h-2 rounded-full bg-loss pulse-dot"></span>
+                <span id="ws-status-text" class="text-sm text-text-muted">连接中...</span>
+            </div>
+
+            <!-- 汇总信息 -->
+            <div class="p-6 border-b ios-separator">
+                <div class="text-xs text-text-muted uppercase tracking-wide mb-2">总资产 (USDT)</div>
+                <div id="total-equity" class="text-3xl font-semibold text-text-primary font-mono">--</div>
+                <div class="flex items-center gap-3 mt-4">
+                    <span class="text-xs text-text-muted">未实现盈亏</span>
+                    <span id="total-pnl" class="text-sm font-mono font-medium">--</span>
+                </div>
+            </div>
+
+            <!-- 账户列表 -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="text-xs text-text-muted uppercase tracking-wide px-3 py-2 mb-2">账户列表</div>
+                <div id="account-list" class="space-y-1">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 刷新按钮 -->
+            <div class="p-4 border-t ios-separator">
+                <button onclick="refreshData()" class="w-full py-3 px-4 btn-ios rounded-xl text-sm font-medium text-white">
+                    刷新数据
+                </button>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 overflow-hidden flex flex-col">
+            <!-- 顶部标签栏 -->
+            <div class="glass border-b ios-separator px-6 py-4 flex items-center gap-2">
+                <button onclick="switchTab('positions')" id="tab-positions" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium tab-active transition-all">
+                    仓位
+                </button>
+                <button onclick="switchTab('assets')" id="tab-assets" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
+                    资产
+                </button>
+                <button onclick="switchTab('pending-orders')" id="tab-pending-orders" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
+                    在途订单
+                </button>
+                <button onclick="switchTab('orders')" id="tab-orders" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
+                    历史订单
+                </button>
+                <button onclick="switchTab('bills')" id="tab-bills" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
+                    账单流水
+                </button>
+                <div class="flex-1"></div>
+                <span id="current-account-name" class="text-sm text-text-muted px-4 py-2 glass-light rounded-lg">全部账户</span>
+            </div>
+
+            <!-- 内容区域 -->
+            <div class="flex-1 overflow-auto p-6">
+                <!-- 仓位视图 -->
+                <div id="view-positions" class="space-y-5">
+                    <!-- 账户资产卡片 -->
+                    <div id="balance-card" class="glass-light rounded-2xl p-6 glass-hover fade-in">
+                        <h3 class="text-xs text-text-muted uppercase tracking-wide mb-5">账户资产</h3>
+                        <div class="grid grid-cols-4 gap-8">
+                            <div>
+                                <div class="text-xs text-text-muted mb-1.5">总权益</div>
+                                <div id="account-equity" class="text-2xl font-mono font-semibold text-text-primary">--</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-text-muted mb-1.5">可用余额</div>
+                                <div id="account-available" class="text-2xl font-mono font-medium text-text-secondary">--</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-text-muted mb-1.5">已用保证金</div>
+                                <div id="account-margin" class="text-2xl font-mono font-medium text-text-secondary">--</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-text-muted mb-1.5">未实现盈亏</div>
+                                <div id="account-pnl" class="text-2xl font-mono font-semibold">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 仓位表格 -->
+                    <div class="glass-light rounded-2xl overflow-hidden fade-in">
+                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                            <h3 class="text-xs text-text-muted uppercase tracking-wide">合约仓位</h3>
+                            <span id="position-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个仓位</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-xs text-text-muted">
+                                    <tr class="border-b ios-separator">
+                                        <th class="text-left px-6 py-3.5 font-medium">合约</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">方向</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">数量</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">开仓均价</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">标记价格</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">未实现盈亏</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">收益率</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">杠杆</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positions-table" class="divide-y divide-ios-separator">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-positions" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="text-4xl mb-4 opacity-50">📭</div>
+                            暂无持仓
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 资产视图 -->
+                <div id="view-assets" class="hidden space-y-5">
+                    <!-- 资产表格 -->
+                    <div class="glass-light rounded-2xl overflow-hidden fade-in">
+                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                            <h3 class="text-xs text-text-muted uppercase tracking-wide">币种资产</h3>
+                            <span id="asset-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个币种</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-xs text-text-muted">
+                                    <tr class="border-b ios-separator">
+                                        <th class="text-left px-6 py-3.5 font-medium">币种</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">余额</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">可用</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">冻结</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">估值 (USDT)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="assets-table" class="divide-y divide-ios-separator">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-assets" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="text-4xl mb-4 opacity-50">💰</div>
+                            暂无资产
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 在途订单视图 -->
+                <div id="view-pending-orders" class="hidden space-y-5">
+                    <!-- 在途订单表格 -->
+                    <div class="glass-light rounded-2xl overflow-hidden fade-in">
+                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-xs text-text-muted uppercase tracking-wide">在途订单</h3>
+                                <span id="pending-order-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个挂单</span>
+                            </div>
+                            <button onclick="loadPendingOrders()" class="px-4 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium transition-all flex items-center gap-2">
+                                <span>刷新</span>
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-xs text-text-muted">
+                                    <tr class="border-b ios-separator">
+                                        <th class="text-left px-6 py-3.5 font-medium">时间</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">合约</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">开平</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">类型</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">委托价</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">委托量</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">已成交</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">成交均价</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pending-orders-table" class="divide-y divide-ios-separator">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-pending-orders" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="text-4xl mb-4 opacity-50">✨</div>
+                            暂无在途订单
+                        </div>
+                        <div id="pending-orders-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <div>加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 订单视图 -->
+                <div id="view-orders" class="hidden space-y-5">
+                    <!-- 时间筛选 -->
+                    <div class="glass-light rounded-2xl p-5 fade-in">
+                        <div class="flex items-end gap-4">
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">开始时间</label>
+                                <input type="datetime-local" id="order-start" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">结束时间</label>
+                                <input type="datetime-local" id="order-end" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                            </div>
+                            <button onclick="loadOrders()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                                查询
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 订单表格 -->
+                    <div class="glass-light rounded-2xl overflow-hidden fade-in">
+                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                            <h3 class="text-xs text-text-muted uppercase tracking-wide">历史订单</h3>
+                            <!-- 分页控件 -->
+                            <div id="orders-pagination" class="hidden flex items-center gap-2">
+                                <button onclick="ordersPrevPage()" id="orders-prev-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                    上一页
+                                </button>
+                                <span id="orders-page-info" class="text-xs text-text-muted px-2">第 1 页</span>
+                                <button onclick="ordersNextPage()" id="orders-next-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                    下一页
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-xs text-text-muted">
+                                    <tr class="border-b ios-separator">
+                                        <th class="text-left px-6 py-3.5 font-medium">时间</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">合约</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">方向</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">类型</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">数量</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">成交均价</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">盈亏</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">手续费</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orders-table" class="divide-y divide-ios-separator">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-orders" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="text-4xl mb-4 opacity-50">📋</div>
+                            暂无订单记录
+                        </div>
+                        <div id="orders-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <div>加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 账单视图 -->
+                <div id="view-bills" class="hidden space-y-5">
+                    <!-- 筛选条件 -->
+                    <div class="glass-light rounded-2xl p-5 fade-in">
+                        <div class="flex items-end gap-4 flex-wrap">
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">账单类型</label>
+                                <select id="bill-type" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
+                                    <option value="">全部</option>
+                                    <option value="2">交易</option>
+                                    <option value="8">资金费</option>
+                                    <option value="1">划转</option>
+                                    <option value="5">强平</option>
+                                    <option value="4">强减</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">开始时间</label>
+                                <input type="datetime-local" id="bill-start" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">结束时间</label>
+                                <input type="datetime-local" id="bill-end" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                            </div>
+                            <button onclick="loadBills()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                                查询
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 账单表格 -->
+                    <div class="glass-light rounded-2xl overflow-hidden fade-in">
+                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <h3 class="text-xs text-text-muted uppercase tracking-wide">账单流水</h3>
+                                <span id="bill-summary" class="text-xs text-text-muted"></span>
+                            </div>
+                            <!-- 分页控件 -->
+                            <div id="bills-pagination" class="hidden flex items-center gap-2">
+                                <button onclick="billsPrevPage()" id="bills-prev-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                    上一页
+                                </button>
+                                <span id="bills-page-info" class="text-xs text-text-muted px-2">第 1 页</span>
+                                <button onclick="billsNextPage()" id="bills-next-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                    下一页
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="text-xs text-text-muted">
+                                    <tr class="border-b ios-separator">
+                                        <th class="text-left px-6 py-3.5 font-medium">时间</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">类型</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">子类型</th>
+                                        <th class="text-center px-6 py-3.5 font-medium">T/M</th>
+                                        <th class="text-left px-6 py-3.5 font-medium">合约</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">收益/支出</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">手续费</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">余额变动</th>
+                                        <th class="text-right px-6 py-3.5 font-medium">账户余额</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bills-table" class="divide-y divide-ios-separator">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="no-bills" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="text-4xl mb-4 opacity-50">📑</div>
+                            暂无账单记录
+                        </div>
+                        <div id="bills-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <div>加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
