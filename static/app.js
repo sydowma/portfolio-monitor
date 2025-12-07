@@ -22,6 +22,8 @@ const state = {
         cursors: [null],
         hasMore: false,
     },
+    // 资产曲线
+    equityChart: null,
 };
 
 // DOM 元素
@@ -277,6 +279,11 @@ function selectAccount(accountId) {
         loadBills();
     } else if (currentTab === 'assets') {
         renderAssetsTable();
+    } else if (currentTab === 'equity-curve') {
+        // 资产曲线需要单账户，切换时重新加载
+        if (accountId !== null) {
+            loadEquityCurve();
+        }
     }
 }
 
@@ -294,6 +301,8 @@ function getCurrentTab() {
         return 'orders';
     } else if (!document.getElementById('view-bills').classList.contains('hidden')) {
         return 'bills';
+    } else if (!document.getElementById('view-equity-curve').classList.contains('hidden')) {
+        return 'equity-curve';
     }
     return 'positions';
 }
@@ -545,11 +554,13 @@ function switchTab(tab) {
     const viewPendingOrders = document.getElementById('view-pending-orders');
     const viewOrders = document.getElementById('view-orders');
     const viewBills = document.getElementById('view-bills');
+    const viewEquityCurve = document.getElementById('view-equity-curve');
     const tabPositions = document.getElementById('tab-positions');
     const tabAssets = document.getElementById('tab-assets');
     const tabPendingOrders = document.getElementById('tab-pending-orders');
     const tabOrders = document.getElementById('tab-orders');
     const tabBills = document.getElementById('tab-bills');
+    const tabEquityCurve = document.getElementById('tab-equity-curve');
 
     const inactiveClass = 'tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all';
     const activeClass = 'tab-btn px-5 py-2 rounded-lg text-sm font-medium tab-active transition-all';
@@ -560,11 +571,13 @@ function switchTab(tab) {
     viewPendingOrders.classList.add('hidden');
     viewOrders.classList.add('hidden');
     viewBills.classList.add('hidden');
+    viewEquityCurve.classList.add('hidden');
     tabPositions.className = inactiveClass;
     tabAssets.className = inactiveClass;
     tabPendingOrders.className = inactiveClass;
     tabOrders.className = inactiveClass;
     tabBills.className = inactiveClass;
+    tabEquityCurve.className = inactiveClass;
 
     if (tab === 'positions') {
         viewPositions.classList.remove('hidden');
@@ -593,6 +606,13 @@ function switchTab(tab) {
         // 首次切换到账单页时加载账单
         if (elements.billsTable.children.length === 0) {
             loadBills();
+        }
+    } else if (tab === 'equity-curve') {
+        viewEquityCurve.classList.remove('hidden');
+        tabEquityCurve.className = activeClass;
+        // 首次切换时加载资产曲线
+        if (!state.equityChart) {
+            loadEquityCurve();
         }
     }
 }
@@ -1233,6 +1253,185 @@ function renderBillsTable(bills, showAccountName = false) {
     }
 
     elements.billsTable.innerHTML = html;
+}
+
+/**
+ * 加载资产曲线数据
+ */
+async function loadEquityCurve() {
+    // 必须选择单个账户
+    if (state.currentAccountId === null) {
+        // 默认选择第一个账户
+        if (state.accounts.length > 0) {
+            const firstAccountId = state.accounts[0].id;
+            selectAccount(firstAccountId);
+            return;
+        }
+        alert('请先选择一个账户');
+        return;
+    }
+
+    const days = document.getElementById('equity-days').value;
+    const interval = document.getElementById('equity-interval').value;
+
+    const loadingEl = document.getElementById('equity-loading');
+    const noDataEl = document.getElementById('no-equity-data');
+    
+    loadingEl.classList.remove('hidden');
+    noDataEl.classList.add('hidden');
+
+    try {
+        const url = `/api/accounts/${state.currentAccountId}/equity-curve?days=${days}&interval=${interval}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        if (!data.points || data.points.length === 0) {
+            noDataEl.classList.remove('hidden');
+            // 清除旧图表
+            if (state.equityChart) {
+                state.equityChart.destroy();
+                state.equityChart = null;
+            }
+            // 清除汇总数据
+            document.getElementById('equity-start').textContent = '--';
+            document.getElementById('equity-end').textContent = '--';
+            document.getElementById('equity-change').textContent = '--';
+            document.getElementById('equity-points').textContent = '--';
+            return;
+        }
+
+        // 更新汇总信息
+        const startBal = data.start_balance || 0;
+        const endBal = data.end_balance || 0;
+        const change = endBal - startBal;
+        const changePercent = startBal > 0 ? ((change / startBal) * 100).toFixed(2) : 0;
+
+        document.getElementById('equity-start').textContent = '$' + formatNumber(startBal);
+        document.getElementById('equity-end').textContent = '$' + formatNumber(endBal);
+        
+        const changeText = (change >= 0 ? '+' : '') + formatNumber(change) + ` (${change >= 0 ? '+' : ''}${changePercent}%)`;
+        const changeEl = document.getElementById('equity-change');
+        changeEl.textContent = changeText;
+        changeEl.className = `text-xl font-mono font-semibold ${change >= 0 ? 'text-profit' : 'text-loss'}`;
+        
+        document.getElementById('equity-points').textContent = data.total_points;
+
+        // 渲染图表
+        renderEquityChart(data.points);
+
+    } catch (err) {
+        console.error('Failed to load equity curve:', err);
+        noDataEl.classList.remove('hidden');
+    } finally {
+        loadingEl.classList.add('hidden');
+    }
+}
+
+/**
+ * 渲染资产曲线图表
+ */
+function renderEquityChart(points) {
+    const ctx = document.getElementById('equity-chart').getContext('2d');
+
+    // 销毁旧图表
+    if (state.equityChart) {
+        state.equityChart.destroy();
+    }
+
+    // 准备数据
+    const labels = points.map(p => {
+        const d = new Date(p.timestamp);
+        return d.toLocaleString('zh-CN', { 
+            month: 'numeric', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+    });
+    const data = points.map(p => p.balance);
+
+    // 计算颜色（根据起止变化）
+    const isProfit = data[data.length - 1] >= data[0];
+    const lineColor = isProfit ? '#34C759' : '#FF3B30';
+    const fillColor = isProfit ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)';
+
+    state.equityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'USDT 余额',
+                data: data,
+                borderColor: lineColor,
+                backgroundColor: fillColor,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.1,
+                pointRadius: points.length > 100 ? 0 : 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: lineColor,
+                pointBorderColor: '#1c1c1e',
+                pointBorderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index',
+            },
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(28, 28, 30, 0.95)',
+                    titleColor: '#ebebf5',
+                    bodyColor: '#ffffff',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        title: function(context) {
+                            const idx = context[0].dataIndex;
+                            const d = new Date(points[idx].timestamp);
+                            return d.toLocaleString('zh-CN');
+                        },
+                        label: function(context) {
+                            return `余额: $${formatNumber(context.raw)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(84, 84, 88, 0.3)',
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: '#8e8e93',
+                        maxTicksLimit: 8,
+                        maxRotation: 0,
+                    }
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(84, 84, 88, 0.3)',
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: '#8e8e93',
+                        callback: function(value) {
+                            return '$' + formatNumber(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 /**

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&family=SF+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -258,6 +259,9 @@
                 </button>
                 <button onclick="switchTab('bills')" id="tab-bills" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
                     账单流水
+                </button>
+                <button onclick="switchTab('equity-curve')" id="tab-equity-curve" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
+                    资产曲线
                 </button>
                 <div class="flex-1"></div>
                 <span id="current-account-name" class="text-sm text-text-muted px-4 py-2 glass-light rounded-lg">全部账户</span>
@@ -537,6 +541,78 @@
                         <div id="bills-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
                             <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
                             <div>加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 资产曲线视图 -->
+                <div id="view-equity-curve" class="hidden space-y-5">
+                    <!-- 筛选条件 -->
+                    <div class="glass-light rounded-2xl p-5 fade-in">
+                        <div class="flex items-end gap-4 flex-wrap">
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">时间范围</label>
+                                <select id="equity-days" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
+                                    <option value="7">最近 7 天</option>
+                                    <option value="14">最近 14 天</option>
+                                    <option value="30" selected>最近 30 天</option>
+                                    <option value="60">最近 60 天</option>
+                                    <option value="90">最近 90 天</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">数据粒度</label>
+                                <select id="equity-interval" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
+                                    <option value="raw">原始数据</option>
+                                    <option value="hourly">按小时</option>
+                                    <option value="daily">按天</option>
+                                </select>
+                            </div>
+                            <button onclick="loadEquityCurve()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                                查询
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 汇总卡片 -->
+                    <div class="grid grid-cols-4 gap-4">
+                        <div class="glass-light rounded-2xl p-5 fade-in">
+                            <div class="text-xs text-text-muted mb-2">起始余额</div>
+                            <div id="equity-start" class="text-xl font-mono font-semibold">--</div>
+                        </div>
+                        <div class="glass-light rounded-2xl p-5 fade-in">
+                            <div class="text-xs text-text-muted mb-2">最新余额</div>
+                            <div id="equity-end" class="text-xl font-mono font-semibold">--</div>
+                        </div>
+                        <div class="glass-light rounded-2xl p-5 fade-in">
+                            <div class="text-xs text-text-muted mb-2">盈亏</div>
+                            <div id="equity-change" class="text-xl font-mono font-semibold">--</div>
+                        </div>
+                        <div class="glass-light rounded-2xl p-5 fade-in">
+                            <div class="text-xs text-text-muted mb-2">数据点</div>
+                            <div id="equity-points" class="text-xl font-mono font-semibold text-text-secondary">--</div>
+                        </div>
+                    </div>
+
+                    <!-- 图表 -->
+                    <div class="glass-light rounded-2xl p-6 fade-in">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xs text-text-muted uppercase tracking-wide">资产曲线 (USDT)</h3>
+                        </div>
+                        <div class="relative" style="height: 400px;">
+                            <canvas id="equity-chart"></canvas>
+                        </div>
+                        <div id="no-equity-data" class="hidden absolute inset-0 flex items-center justify-center text-text-muted text-sm">
+                            <div class="text-center">
+                                <div class="text-4xl mb-4 opacity-50">📈</div>
+                                暂无数据
+                            </div>
+                        </div>
+                        <div id="equity-loading" class="hidden absolute inset-0 flex items-center justify-center">
+                            <div class="text-center text-text-muted text-sm">
+                                <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+                                <div>加载中...</div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -2,9 +2,11 @@
 REST API 路由
 提供账户列表、资产、仓位、历史订单等接口
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
+from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from config import ACCOUNTS, get_account
 from models import AccountInfo, Balance, Position, Order, Bill, AccountSummary, PaginatedOrders, PaginatedBills, PendingOrder
@@ -12,6 +14,20 @@ from okx import OKXRestClient
 
 
 router = APIRouter(prefix="/api", tags=["api"])
+
+
+class EquityCurvePoint(BaseModel):
+    """资产曲线数据点"""
+    timestamp: str
+    balance: float
+
+
+class EquityCurveResponse(BaseModel):
+    """资产曲线响应"""
+    points: list[EquityCurvePoint]
+    start_balance: Optional[float] = None
+    end_balance: Optional[float] = None
+    total_points: int = 0
 
 
 @router.get("/accounts", response_model=list[AccountInfo])
@@ -151,6 +167,107 @@ async def get_bills(
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         await client.close()
+
+
+@router.get("/accounts/{account_id}/equity-curve", response_model=EquityCurveResponse)
+async def get_equity_curve(
+    account_id: str,
+    days: int = Query(30, ge=1, le=90, description="查询天数，最多90天"),
+    interval: str = Query("raw", description="聚合间隔: raw/hourly/daily"),
+):
+    """
+    获取账户资产曲线数据
+    基于账单流水的 bal 字段反推历史资产
+    """
+    account = get_account(account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    client = OKXRestClient(account)
+    try:
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - timedelta(days=days)
+
+        # 收集所有 USDT 账单
+        all_bills = []
+        after = None
+        max_pages = 50
+
+        for _ in range(max_pages):
+            bills, has_more, last_id = await client.get_bills(
+                bill_type=None,
+                inst_id=None,
+                start_time=start_time,
+                end_time=end_time,
+                after=after,
+                limit=100,
+            )
+            # 只保留 USDT 账单
+            usdt_bills = [b for b in bills if b.ccy == "USDT"]
+            all_bills.extend(usdt_bills)
+
+            if not has_more or not last_id:
+                break
+            after = last_id
+
+        if not all_bills:
+            return EquityCurveResponse(points=[], total_points=0)
+
+        # 按时间排序（从早到晚）
+        all_bills.sort(key=lambda b: b.timestamp)
+
+        # 构建数据点
+        points = []
+        for bill in all_bills:
+            points.append(EquityCurvePoint(
+                timestamp=bill.timestamp.isoformat(),
+                balance=bill.bal,
+            ))
+
+        # 按间隔聚合
+        if interval == "hourly":
+            points = _aggregate_by_hour(points)
+        elif interval == "daily":
+            points = _aggregate_by_day(points)
+
+        return EquityCurveResponse(
+            points=points,
+            start_balance=points[0].balance if points else None,
+            end_balance=points[-1].balance if points else None,
+            total_points=len(points),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await client.close()
+
+
+def _aggregate_by_hour(points: list[EquityCurvePoint]) -> list[EquityCurvePoint]:
+    """按小时聚合，取每小时最后一个点"""
+    if not points:
+        return []
+    
+    hourly = {}
+    for p in points:
+        # 截取到小时
+        hour_key = p.timestamp[:13]  # "2025-12-07T09"
+        hourly[hour_key] = p
+    
+    return list(hourly.values())
+
+
+def _aggregate_by_day(points: list[EquityCurvePoint]) -> list[EquityCurvePoint]:
+    """按天聚合，取每天最后一个点"""
+    if not points:
+        return []
+    
+    daily = {}
+    for p in points:
+        # 截取到天
+        day_key = p.timestamp[:10]  # "2025-12-07"
+        daily[day_key] = p
+    
+    return list(daily.values())
 
 
 @router.get("/summary", response_model=list[AccountSummary])
