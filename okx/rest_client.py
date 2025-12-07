@@ -114,9 +114,9 @@ class OKXRestClient:
         available = safe_float(usdt_detail.get("availBal")) if usdt_detail else 0
         frozen = safe_float(usdt_detail.get("frozenBal")) if usdt_detail else 0
 
-        # 已用保证金和未实现盈亏
-        margin_used = safe_float(account_data.get("imr"))  # 初始保证金
-        unrealized_pnl = safe_float(account_data.get("upl"))
+        # 已用保证金和未实现盈亏 (从 USDT 币种明细获取)
+        margin_used = safe_float(usdt_detail.get("frozenBal")) if usdt_detail else 0  # 冻结余额作为已用保证金
+        unrealized_pnl = safe_float(usdt_detail.get("upl")) if usdt_detail else 0  # USDT 币种的未实现盈亏
 
         # 解析各币种资产
         assets = []

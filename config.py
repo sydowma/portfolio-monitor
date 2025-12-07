@@ -3,6 +3,7 @@
 从环境变量中自动扫描并加载所有 OKX 账户配置
 """
 import os
+import re
 from dataclasses import dataclass
 from typing import Optional
 from dotenv import load_dotenv
@@ -38,19 +39,24 @@ class AccountConfig:
 def load_accounts() -> list[AccountConfig]:
     """
     从环境变量加载所有账户配置
-    扫描 OKX_ACCOUNT_{N}_NAME 格式的环境变量
+    扫描所有匹配 OKX_ACCOUNT_{N}_NAME 格式的环境变量（不要求连续编号）
     """
     accounts = []
-    index = 1
+    pattern = re.compile(r"^OKX_ACCOUNT_(\d+)_NAME$")
 
-    while True:
+    # 找出所有匹配的账户编号
+    account_indices = []
+    for key in os.environ:
+        match = pattern.match(key)
+        if match:
+            account_indices.append(int(match.group(1)))
+
+    # 按编号排序
+    account_indices.sort()
+
+    for index in account_indices:
         prefix = f"OKX_ACCOUNT_{index}_"
         name = os.getenv(f"{prefix}NAME")
-
-        # 如果没有找到 NAME，说明没有更多账户了
-        if not name:
-            break
-
         api_key = os.getenv(f"{prefix}API_KEY")
         secret_key = os.getenv(f"{prefix}SECRET_KEY")
         passphrase = os.getenv(f"{prefix}PASSPHRASE")
@@ -59,7 +65,6 @@ def load_accounts() -> list[AccountConfig]:
         # 跳过配置不完整的账户
         if not all([api_key, secret_key, passphrase]):
             print(f"Warning: Account {index} ({name}) has incomplete config, skipping")
-            index += 1
             continue
 
         accounts.append(AccountConfig(
@@ -70,7 +75,6 @@ def load_accounts() -> list[AccountConfig]:
             passphrase=passphrase,
             simulated=simulated,
         ))
-        index += 1
 
     return accounts
 
