@@ -97,32 +97,41 @@ class OKXRestClient:
         account_data = data[0]
         details = account_data.get("details", [])
 
+        # 辅助函数：安全解析浮点数（处理空字符串）
+        def safe_float(val, default=0):
+            if val is None or val == "":
+                return default
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
         # 计算 USDT 为主的资产
-        total_equity = float(account_data.get("totalEq", 0))
+        total_equity = safe_float(account_data.get("totalEq"))
         
         # 查找 USDT 余额详情
         usdt_detail = next((d for d in details if d.get("ccy") == "USDT"), None)
-        available = float(usdt_detail.get("availBal", 0)) if usdt_detail else 0
-        frozen = float(usdt_detail.get("frozenBal", 0)) if usdt_detail else 0
+        available = safe_float(usdt_detail.get("availBal")) if usdt_detail else 0
+        frozen = safe_float(usdt_detail.get("frozenBal")) if usdt_detail else 0
 
         # 已用保证金和未实现盈亏
-        margin_used = float(account_data.get("imr", 0))  # 初始保证金
-        unrealized_pnl = float(account_data.get("upl", 0))
+        margin_used = safe_float(account_data.get("imr"))  # 初始保证金
+        unrealized_pnl = safe_float(account_data.get("upl"))
 
         # 解析各币种资产
         assets = []
         for detail in details:
-            bal = float(detail.get("cashBal", 0) or 0)
-            eq = float(detail.get("eq", 0) or 0)
+            bal = safe_float(detail.get("cashBal"))
+            eq = safe_float(detail.get("eq"))
             # 只保留有余额或有权益的币种
             if bal > 0 or eq > 0:
                 assets.append(CurrencyAsset(
                     ccy=detail.get("ccy", ""),
                     bal=bal,
-                    avail_bal=float(detail.get("availBal", 0) or 0),
-                    frozen_bal=float(detail.get("frozenBal", 0) or 0),
+                    avail_bal=safe_float(detail.get("availBal")),
+                    frozen_bal=safe_float(detail.get("frozenBal")),
                     eq=eq,
-                    eq_usd=float(detail.get("eqUsd", 0) or 0),
+                    eq_usd=safe_float(detail.get("eqUsd")),
                 ))
         
         # 按权益排序，大的在前

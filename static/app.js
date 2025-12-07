@@ -38,11 +38,13 @@ const elements = {
     accountAvailable: document.getElementById('account-available'),
     accountMargin: document.getElementById('account-margin'),
     accountPnl: document.getElementById('account-pnl'),
+    marginRatioBar: document.getElementById('margin-ratio-bar'),
+    marginRatioText: document.getElementById('margin-ratio-text'),
     positionsContainer: document.getElementById('positions-container'),
     positionCount: document.getElementById('position-count'),
     noPositions: document.getElementById('no-positions'),
     // 资产
-    assetsTable: document.getElementById('assets-table'),
+    assetsContainer: document.getElementById('assets-container'),
     assetCount: document.getElementById('asset-count'),
     noAssets: document.getElementById('no-assets'),
     // 在途订单
@@ -224,11 +226,12 @@ function updateWsStatus(connected) {
  */
 function renderAccountList() {
     let html = `
-        <button onclick="selectAccount(null)" class="account-btn w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${state.currentAccountId === null ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
+        <button onclick="selectAccount(null)" class="account-btn group relative w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${state.currentAccountId === null ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
+            ${state.currentAccountId === null ? '<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>' : ''}
             <div class="flex items-center justify-between">
                 <span class="flex items-center gap-2">
-                    <span class="text-base">📊</span>
-                    <span>全部账户</span>
+                    <span class="text-base group-hover:scale-110 transition-transform">📊</span>
+                    <span class="font-medium">全部账户</span>
                 </span>
                 <span class="text-xs ${state.currentAccountId === null ? 'text-white/70' : 'text-text-muted'} px-2 py-0.5 ${state.currentAccountId === null ? 'bg-white/20' : 'bg-ios-elevated'} rounded-full">${state.accounts.length}</span>
             </div>
@@ -239,14 +242,23 @@ function renderAccountList() {
         const isActive = state.currentAccountId === account.id;
         const balance = state.balances[account.id];
         const equity = balance ? formatNumber(balance.total_equity) : '--';
+        const pnl = balance ? balance.unrealized_pnl : 0;
+        const pnlClass = pnl >= 0 ? 'text-profit' : 'text-loss';
 
         html += `
-            <button onclick="selectAccount('${account.id}')" class="account-btn w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${isActive ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
-                <div class="flex items-center gap-2">
-                    <span class="text-base">${account.simulated ? '🎮' : '💰'}</span>
-                    <span>${account.name}</span>
+            <button onclick="selectAccount('${account.id}')" class="account-btn group relative w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${isActive ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
+                ${isActive ? '<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>' : ''}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base group-hover:scale-110 transition-transform">${account.simulated ? '🎮' : '💰'}</span>
+                        <span class="font-medium">${account.name}</span>
+                    </div>
+                    ${account.simulated ? '<span class="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">模拟</span>' : ''}
                 </div>
-                <div class="text-xs ${isActive ? 'text-white/70' : 'text-text-muted'} font-mono mt-1.5 ml-6">$${equity}</div>
+                <div class="flex items-center justify-between mt-1.5 ml-6">
+                    <span class="text-xs ${isActive ? 'text-white/70' : 'text-text-muted'} font-mono">$${equity}</span>
+                    ${balance && pnl !== 0 ? `<span class="text-xs font-mono ${isActive ? 'text-white/70' : pnlClass}">${pnl >= 0 ? '+' : ''}${formatNumber(pnl)}</span>` : ''}
+                </div>
             </button>
         `;
     }
@@ -342,13 +354,13 @@ function renderCurrentView() {
  * 渲染资产卡片
  */
 function renderBalanceCard() {
+    let totalEquity = 0;
+    let totalAvailable = 0;
+    let totalMargin = 0;
+    let totalPnl = 0;
+
     if (state.currentAccountId === null) {
         // 显示汇总
-        let totalEquity = 0;
-        let totalAvailable = 0;
-        let totalMargin = 0;
-        let totalPnl = 0;
-
         for (const accountId in state.balances) {
             const balance = state.balances[accountId];
             totalEquity += balance.total_equity || 0;
@@ -356,32 +368,47 @@ function renderBalanceCard() {
             totalMargin += balance.margin_used || 0;
             totalPnl += balance.unrealized_pnl || 0;
         }
+    } else {
+        const balance = state.balances[state.currentAccountId];
+        if (balance) {
+            totalEquity = balance.total_equity || 0;
+            totalAvailable = balance.available || 0;
+            totalMargin = balance.margin_used || 0;
+            totalPnl = balance.unrealized_pnl || 0;
+        }
+    }
 
+    // 更新显示
+    if (totalEquity > 0 || state.currentAccountId !== null) {
         elements.accountEquity.textContent = '$' + formatNumber(totalEquity);
         elements.accountAvailable.textContent = '$' + formatNumber(totalAvailable);
         elements.accountMargin.textContent = '$' + formatNumber(totalMargin);
 
         const pnlText = (totalPnl >= 0 ? '+' : '') + formatNumber(totalPnl);
         elements.accountPnl.textContent = '$' + pnlText;
-        elements.accountPnl.className = `text-2xl font-mono font-semibold ${totalPnl >= 0 ? 'text-profit' : 'text-loss'}`;
-    } else {
-        const balance = state.balances[state.currentAccountId];
-        if (balance) {
-            elements.accountEquity.textContent = '$' + formatNumber(balance.total_equity);
-            elements.accountAvailable.textContent = '$' + formatNumber(balance.available);
-            elements.accountMargin.textContent = '$' + formatNumber(balance.margin_used);
+        elements.accountPnl.className = `text-2xl font-mono font-semibold ${totalPnl >= 0 ? 'text-profit glow-profit' : 'text-loss glow-loss'}`;
 
-            const pnl = balance.unrealized_pnl || 0;
-            const pnlText = (pnl >= 0 ? '+' : '') + formatNumber(pnl);
-            elements.accountPnl.textContent = '$' + pnlText;
-            elements.accountPnl.className = `text-2xl font-mono font-semibold ${pnl >= 0 ? 'text-profit' : 'text-loss'}`;
+        // 计算保证金使用率
+        const marginRatio = totalEquity > 0 ? (totalMargin / totalEquity) * 100 : 0;
+        elements.marginRatioBar.style.width = `${Math.min(marginRatio, 100)}%`;
+        elements.marginRatioText.textContent = `${marginRatio.toFixed(1)}%`;
+        
+        // 根据使用率变色
+        if (marginRatio > 80) {
+            elements.marginRatioBar.className = 'h-full bg-loss rounded-full transition-all';
+        } else if (marginRatio > 50) {
+            elements.marginRatioBar.className = 'h-full bg-yellow-500 rounded-full transition-all';
         } else {
-            elements.accountEquity.textContent = '--';
-            elements.accountAvailable.textContent = '--';
-            elements.accountMargin.textContent = '--';
-            elements.accountPnl.textContent = '--';
-            elements.accountPnl.className = 'text-2xl font-mono font-semibold';
+            elements.marginRatioBar.className = 'h-full bg-accent rounded-full transition-all';
         }
+    } else {
+        elements.accountEquity.textContent = '--';
+        elements.accountAvailable.textContent = '--';
+        elements.accountMargin.textContent = '--';
+        elements.accountPnl.textContent = '--';
+        elements.accountPnl.className = 'text-2xl font-mono font-semibold';
+        elements.marginRatioBar.style.width = '0%';
+        elements.marginRatioText.textContent = '0%';
     }
 }
 
@@ -498,7 +525,7 @@ function renderPositionsTable() {
 }
 
 /**
- * 渲染资产表格
+ * 渲染资产卡片
  */
 function renderAssetsTable() {
     let assets = [];
@@ -541,7 +568,7 @@ function renderAssetsTable() {
     elements.assetCount.textContent = `${assets.length} 个币种`;
 
     if (assets.length === 0) {
-        elements.assetsTable.innerHTML = '';
+        elements.assetsContainer.innerHTML = '';
         elements.noAssets.classList.remove('hidden');
         return;
     }
@@ -553,30 +580,65 @@ function renderAssetsTable() {
         const iconUrl = getCryptoIconUrl(asset.ccy);
         const fallbackText = asset.ccy.slice(0, 2);
         
+        // 计算可用比例
+        const availRatio = asset.bal > 0 ? (asset.avail_bal / asset.bal) * 100 : 100;
+        
         html += `
-            <tr class="table-row-hover">
-                <td class="px-6 py-4">
+            <div class="asset-card bg-ios-elevated rounded-xl p-4 hover:bg-ios-surface transition-all border border-transparent hover:border-accent/20">
+                <!-- 头部：币种图标 + 名称 + 估值 -->
+                <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-ios-elevated flex items-center justify-center overflow-hidden">
+                        <div class="w-10 h-10 rounded-full bg-ios-surface flex items-center justify-center overflow-hidden">
                             <img src="${iconUrl}" 
                                  alt="${asset.ccy}" 
-                                 class="w-6 h-6"
+                                 class="w-7 h-7"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                             />
-                            <span class="text-xs font-semibold hidden items-center justify-center w-full h-full">${fallbackText}</span>
+                            <span class="text-sm font-bold hidden items-center justify-center w-full h-full text-accent">${fallbackText}</span>
                         </div>
-                        <span class="font-medium">${asset.ccy}</span>
+                        <div>
+                            <div class="font-semibold text-text-primary">${asset.ccy}</div>
+                            <div class="text-xs text-text-muted">估值</div>
+                        </div>
                     </div>
-                </td>
-                <td class="px-6 py-4 text-right font-mono text-sm">${formatAssetNumber(asset.bal)}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm text-text-secondary">${formatAssetNumber(asset.avail_bal)}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm text-text-muted">${formatAssetNumber(asset.frozen_bal)}</td>
-                <td class="px-6 py-4 text-right font-mono text-sm font-medium">${formatNumber(asset.eq)}</td>
-            </tr>
+                    <div class="text-right">
+                        <div class="text-xl font-mono font-bold text-text-primary">$${formatNumber(asset.eq)}</div>
+                    </div>
+                </div>
+
+                <!-- 余额详情 -->
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between items-center">
+                        <span class="text-text-muted">总余额</span>
+                        <span class="font-mono text-text-secondary">${formatAssetNumber(asset.bal)}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-text-muted">可用</span>
+                        <span class="font-mono text-profit">${formatAssetNumber(asset.avail_bal)}</span>
+                    </div>
+                    ${asset.frozen_bal > 0 ? `
+                    <div class="flex justify-between items-center">
+                        <span class="text-text-muted">冻结</span>
+                        <span class="font-mono text-loss/70">${formatAssetNumber(asset.frozen_bal)}</span>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <!-- 可用比例进度条 -->
+                <div class="mt-3 pt-3 border-t border-ios-separator">
+                    <div class="flex justify-between items-center text-xs mb-1.5">
+                        <span class="text-text-muted">可用比例</span>
+                        <span class="font-mono text-text-secondary">${availRatio.toFixed(1)}%</span>
+                    </div>
+                    <div class="h-1.5 bg-ios-surface rounded-full overflow-hidden">
+                        <div class="h-full bg-accent rounded-full transition-all" style="width: ${availRatio}%"></div>
+                    </div>
+                </div>
+            </div>
         `;
     }
 
-    elements.assetsTable.innerHTML = html;
+    elements.assetsContainer.innerHTML = html;
 }
 
 /**
@@ -1288,6 +1350,9 @@ function renderBillsTable(bills, showAccountName = false) {
         const balChgText = balChg !== 0 ? ((balChg >= 0 ? '+' : '') + formatNumber(balChg)) : '-';
         const balChgClass = balChg >= 0 ? 'text-profit' : 'text-loss';
 
+        // 根据余额变动添加行高亮
+        const rowHighlight = balChg !== 0 ? (balChg >= 0 ? 'profit-highlight' : 'loss-highlight') : '';
+
         // 子类型样式
         let subTypeClass = 'text-text-secondary';
         // Maker 返佣、资金费收入、返还类 - 绿色
@@ -1304,29 +1369,40 @@ function renderBillsTable(bills, showAccountName = false) {
         // Taker/Maker 显示
         let execTypeText = '-';
         let execTypeClass = 'text-text-muted';
+        let execTypeBg = '';
         if (bill.exec_type === 'T') {
             execTypeText = 'T';
             execTypeClass = 'text-loss';
+            execTypeBg = 'bg-loss/15';
         } else if (bill.exec_type === 'M') {
             execTypeText = 'M';
             execTypeClass = 'text-profit';
+            execTypeBg = 'bg-profit/15';
         }
 
+        // 账单类型颜色
+        let typeClass = 'bg-ios-elevated';
+        if (bill.bill_type === '2') typeClass = 'bg-accent/15 text-accent'; // 交易
+        else if (bill.bill_type === '8') typeClass = 'bg-purple-500/15 text-purple-400'; // 资金费
+        else if (bill.bill_type === '1') typeClass = 'bg-blue-500/15 text-blue-400'; // 划转
+
         html += `
-            <tr class="table-row-hover">
+            <tr class="table-row-hover ${rowHighlight}">
                 <td class="px-6 py-3.5 text-sm">
                     ${time}
                     ${showAccountName ? `<div class="text-xs text-text-muted mt-1">${bill.accountName}</div>` : ''}
                 </td>
                 <td class="px-6 py-3.5 text-sm">
-                    <span class="px-2 py-1 rounded-md text-xs font-medium bg-ios-elevated">${typeText}</span>
+                    <span class="px-2 py-1 rounded-md text-xs font-medium ${typeClass}">${typeText}</span>
                 </td>
                 <td class="px-6 py-3.5 text-sm ${subTypeClass}">${subTypeText}</td>
-                <td class="px-6 py-3.5 text-center text-sm font-mono font-medium ${execTypeClass}">${execTypeText}</td>
+                <td class="px-6 py-3.5 text-center text-sm">
+                    ${execTypeText !== '-' ? `<span class="px-1.5 py-0.5 rounded text-xs font-semibold ${execTypeClass} ${execTypeBg}">${execTypeText}</span>` : '<span class="text-text-muted">-</span>'}
+                </td>
                 <td class="px-6 py-3.5 font-mono text-sm">${bill.inst_id || '-'}</td>
-                <td class="px-6 py-3.5 text-right font-mono text-sm font-medium ${pnlClass}">${pnlText}</td>
+                <td class="px-6 py-3.5 text-right font-mono text-sm font-semibold ${pnlClass}">${pnlText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${feeText}</td>
-                <td class="px-6 py-3.5 text-right font-mono text-sm font-medium ${balChgClass}">${balChgText}</td>
+                <td class="px-6 py-3.5 text-right font-mono text-sm font-semibold ${balChgClass}">${balChgText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${formatNumber(bill.bal)}</td>
             </tr>
         `;
@@ -1530,6 +1606,7 @@ function renderOrdersTable(orders, showAccountName = false) {
         const isBuy = order.side === 'buy';
         const sideText = isBuy ? '买入' : '卖出';
         const sideClass = isBuy ? 'text-profit' : 'text-loss';
+        const sideBgClass = isBuy ? 'bg-profit/15' : 'bg-loss/15';
 
         const typeMap = {
             'market': '市价',
@@ -1547,27 +1624,35 @@ function renderOrdersTable(orders, showAccountName = false) {
             'live': '待成交',
         };
         const stateText = stateMap[order.state] || order.state;
+        const stateClass = order.state === 'filled' ? 'bg-profit/15 text-profit' : 
+                          order.state === 'canceled' ? 'bg-loss/15 text-loss' : 'bg-ios-elevated';
 
         const pnlText = order.pnl ? ((order.pnl >= 0 ? '+' : '') + formatNumber(order.pnl)) : '-';
         const pnlClass = order.pnl >= 0 ? 'text-profit' : 'text-loss';
+        
+        // 根据盈亏添加行高亮
+        const rowHighlight = order.pnl && Math.abs(order.pnl) > 0 ? 
+            (order.pnl >= 0 ? 'profit-highlight' : 'loss-highlight') : '';
 
         const time = new Date(order.created_at).toLocaleString('zh-CN');
 
         html += `
-            <tr class="table-row-hover">
+            <tr class="table-row-hover ${rowHighlight}">
                 <td class="px-6 py-3.5 text-sm">
                     ${time}
                     ${showAccountName ? `<div class="text-xs text-text-muted mt-1">${order.accountName}</div>` : ''}
                 </td>
                 <td class="px-6 py-3.5 font-mono text-sm font-medium">${order.inst_id}</td>
-                <td class="px-6 py-3.5 ${sideClass} text-sm font-medium">${sideText}</td>
+                <td class="px-6 py-3.5 text-sm">
+                    <span class="px-2 py-1 rounded-md text-xs font-medium ${sideClass} ${sideBgClass}">${sideText}</span>
+                </td>
                 <td class="px-6 py-3.5 text-sm text-text-muted">${typeText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm">${order.sz}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${order.avg_px ? formatPrice(order.avg_px) : '-'}</td>
-                <td class="px-6 py-3.5 text-right font-mono text-sm font-medium ${pnlClass}">${pnlText}</td>
+                <td class="px-6 py-3.5 text-right font-mono text-sm font-semibold ${pnlClass}">${pnlText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${formatNumber(Math.abs(order.fee))}</td>
                 <td class="px-6 py-3.5 text-sm">
-                    <span class="px-2 py-1 rounded-md text-xs font-medium bg-ios-elevated">${stateText}</span>
+                    <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
                 </td>
             </tr>
         `;

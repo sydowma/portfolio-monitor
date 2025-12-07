@@ -175,6 +175,34 @@
             background: rgba(255, 255, 255, 0.04);
         }
 
+        /* 表格斑马纹 */
+        .table-row-hover:nth-child(odd) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .table-row-hover:nth-child(odd):hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* 盈亏高亮背景 */
+        .profit-highlight {
+            background: rgba(52, 199, 89, 0.08);
+        }
+
+        .loss-highlight {
+            background: rgba(255, 59, 48, 0.08);
+        }
+
+        /* 慢速弹跳动画 */
+        .animate-bounce-slow {
+            animation: bounce-slow 3s ease-in-out infinite;
+        }
+
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
         /* iOS 分隔线 */
         .ios-separator {
             border-color: rgba(84, 84, 88, 0.65);
@@ -274,21 +302,40 @@
                     <!-- 账户资产卡片 -->
                     <div id="balance-card" class="glass-light rounded-2xl p-6 glass-hover fade-in">
                         <h3 class="text-xs text-text-muted uppercase tracking-wide mb-5">账户资产</h3>
-                        <div class="grid grid-cols-4 gap-8">
-                            <div>
-                                <div class="text-xs text-text-muted mb-1.5">总权益</div>
+                        <div class="grid grid-cols-4 gap-6">
+                            <div class="relative">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-base">💎</span>
+                                    <span class="text-xs text-text-muted">总权益</span>
+                                </div>
                                 <div id="account-equity" class="text-2xl font-mono font-semibold text-text-primary">--</div>
                             </div>
-                            <div>
-                                <div class="text-xs text-text-muted mb-1.5">可用余额</div>
-                                <div id="account-available" class="text-2xl font-mono font-medium text-text-secondary">--</div>
+                            <div class="relative">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-base">💵</span>
+                                    <span class="text-xs text-text-muted">可用余额</span>
+                                </div>
+                                <div id="account-available" class="text-2xl font-mono font-medium text-profit">--</div>
                             </div>
-                            <div>
-                                <div class="text-xs text-text-muted mb-1.5">已用保证金</div>
+                            <div class="relative">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-base">🔒</span>
+                                    <span class="text-xs text-text-muted">已用保证金</span>
+                                </div>
                                 <div id="account-margin" class="text-2xl font-mono font-medium text-text-secondary">--</div>
+                                <!-- 保证金使用率 -->
+                                <div class="mt-2">
+                                    <div class="h-1.5 bg-ios-elevated rounded-full overflow-hidden">
+                                        <div id="margin-ratio-bar" class="h-full bg-accent rounded-full transition-all" style="width: 0%"></div>
+                                    </div>
+                                    <div id="margin-ratio-text" class="text-xs text-text-muted mt-1 font-mono">0%</div>
+                                </div>
                             </div>
-                            <div>
-                                <div class="text-xs text-text-muted mb-1.5">未实现盈亏</div>
+                            <div class="relative">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-base">📊</span>
+                                    <span class="text-xs text-text-muted">未实现盈亏</span>
+                                </div>
                                 <div id="account-pnl" class="text-2xl font-mono font-semibold">--</div>
                             </div>
                         </div>
@@ -304,39 +351,28 @@
                             <!-- 动态生成卡片 -->
                         </div>
                         <div id="no-positions" class="hidden px-6 py-16 text-center text-text-muted text-sm">
-                            <div class="text-4xl mb-4 opacity-50">📭</div>
-                            暂无持仓
+                            <div class="text-5xl mb-4 opacity-40 animate-pulse">📭</div>
+                            <div class="text-base mb-1">暂无持仓</div>
+                            <div class="text-xs text-text-muted/60">当前没有活跃的合约仓位</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- 资产视图 -->
                 <div id="view-assets" class="hidden space-y-5">
-                    <!-- 资产表格 -->
+                    <!-- 资产卡片 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
                         <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
                             <h3 class="text-xs text-text-muted uppercase tracking-wide">币种资产</h3>
                             <span id="asset-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个币种</span>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead class="text-xs text-text-muted">
-                                    <tr class="border-b ios-separator">
-                                        <th class="text-left px-6 py-3.5 font-medium">币种</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">余额</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">可用</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">冻结</th>
-                                        <th class="text-right px-6 py-3.5 font-medium">估值 (USDT)</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="assets-table" class="divide-y divide-ios-separator">
-                                    <!-- 动态生成 -->
-                                </tbody>
-                            </table>
+                        <div id="assets-container" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <!-- 动态生成卡片 -->
                         </div>
                         <div id="no-assets" class="hidden px-6 py-16 text-center text-text-muted text-sm">
-                            <div class="text-4xl mb-4 opacity-50">💰</div>
-                            暂无资产
+                            <div class="text-5xl mb-4 opacity-40 animate-bounce-slow">💰</div>
+                            <div class="text-base mb-1">暂无资产</div>
+                            <div class="text-xs text-text-muted/60">资产数据将在连接后显示</div>
                         </div>
                     </div>
                 </div>
@@ -375,8 +411,9 @@
                             </table>
                         </div>
                         <div id="no-pending-orders" class="hidden px-6 py-16 text-center text-text-muted text-sm">
-                            <div class="text-4xl mb-4 opacity-50">✨</div>
-                            暂无在途订单
+                            <div class="text-5xl mb-4 opacity-40">✨</div>
+                            <div class="text-base mb-1">暂无在途订单</div>
+                            <div class="text-xs text-text-muted/60">所有订单已成交或取消</div>
                         </div>
                         <div id="pending-orders-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
                             <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -440,8 +477,9 @@
                             </table>
                         </div>
                         <div id="no-orders" class="hidden px-6 py-16 text-center text-text-muted text-sm">
-                            <div class="text-4xl mb-4 opacity-50">📋</div>
-                            暂无订单记录
+                            <div class="text-5xl mb-4 opacity-40">📋</div>
+                            <div class="text-base mb-1">暂无订单记录</div>
+                            <div class="text-xs text-text-muted/60">选择时间范围查询历史订单</div>
                         </div>
                         <div id="orders-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
                             <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -519,8 +557,9 @@
                             </table>
                         </div>
                         <div id="no-bills" class="hidden px-6 py-16 text-center text-text-muted text-sm">
-                            <div class="text-4xl mb-4 opacity-50">📑</div>
-                            暂无账单记录
+                            <div class="text-5xl mb-4 opacity-40">📑</div>
+                            <div class="text-base mb-1">暂无账单记录</div>
+                            <div class="text-xs text-text-muted/60">选择时间范围查询账单流水</div>
                         </div>
                         <div id="bills-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
                             <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -560,20 +599,32 @@
 
                     <!-- 汇总卡片 -->
                     <div class="grid grid-cols-4 gap-4">
-                        <div class="glass-light rounded-2xl p-5 fade-in">
-                            <div class="text-xs text-text-muted mb-2">起始余额</div>
+                        <div class="glass-light rounded-2xl p-5 fade-in hover:bg-glass-hover transition-all">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg">📅</span>
+                                <span class="text-xs text-text-muted">起始余额</span>
+                            </div>
                             <div id="equity-start" class="text-xl font-mono font-semibold">--</div>
                         </div>
-                        <div class="glass-light rounded-2xl p-5 fade-in">
-                            <div class="text-xs text-text-muted mb-2">最新余额</div>
+                        <div class="glass-light rounded-2xl p-5 fade-in hover:bg-glass-hover transition-all">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg">💰</span>
+                                <span class="text-xs text-text-muted">最新余额</span>
+                            </div>
                             <div id="equity-end" class="text-xl font-mono font-semibold">--</div>
                         </div>
-                        <div class="glass-light rounded-2xl p-5 fade-in">
-                            <div class="text-xs text-text-muted mb-2">盈亏</div>
+                        <div class="glass-light rounded-2xl p-5 fade-in hover:bg-glass-hover transition-all">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg" id="equity-change-icon">📊</span>
+                                <span class="text-xs text-text-muted">盈亏</span>
+                            </div>
                             <div id="equity-change" class="text-xl font-mono font-semibold">--</div>
                         </div>
-                        <div class="glass-light rounded-2xl p-5 fade-in">
-                            <div class="text-xs text-text-muted mb-2">数据点</div>
+                        <div class="glass-light rounded-2xl p-5 fade-in hover:bg-glass-hover transition-all">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg">📍</span>
+                                <span class="text-xs text-text-muted">数据点</span>
+                            </div>
                             <div id="equity-points" class="text-xl font-mono font-semibold text-text-secondary">--</div>
                         </div>
                     </div>
@@ -588,8 +639,9 @@
                         </div>
                         <div id="no-equity-data" class="hidden absolute inset-0 flex items-center justify-center text-text-muted text-sm">
                             <div class="text-center">
-                                <div class="text-4xl mb-4 opacity-50">📈</div>
-                                暂无数据
+                                <div class="text-5xl mb-4 opacity-40">📈</div>
+                                <div class="text-base mb-1">暂无数据</div>
+                                <div class="text-xs text-text-muted/60">选择账户和时间范围查询资产曲线</div>
                             </div>
                         </div>
                         <div id="equity-loading" class="hidden absolute inset-0 flex items-center justify-center">
