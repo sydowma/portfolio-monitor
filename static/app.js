@@ -471,9 +471,13 @@ function renderPositionsTable() {
         const liqPxText = pos.liq_px ? formatPrice(pos.liq_px) : '--';
 
         html += `
-            <div class="position-card bg-ios-elevated rounded-xl p-4 border ${borderClass} hover:bg-ios-surface transition-all">
+            <div class="position-card relative bg-ios-elevated rounded-xl p-4 border ${borderClass} hover:bg-ios-surface transition-all">
+                <!-- 悬浮详情按钮 -->
+                <div class="absolute top-2 right-2">
+                    ${detailBtnHtml('position', pos)}
+                </div>
                 <!-- 头部：合约名 + 方向 + 杠杆 -->
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-3 pr-12">
                     <div class="flex items-center gap-2">
                         <span class="font-mono text-sm font-semibold text-text-primary">${pos.inst_id}</span>
                         <span class="px-2 py-0.5 rounded text-xs font-semibold ${directionClass} ${directionBgClass}">
@@ -584,9 +588,13 @@ function renderAssetsTable() {
         const availRatio = asset.bal > 0 ? (asset.avail_bal / asset.bal) * 100 : 100;
         
         html += `
-            <div class="asset-card bg-ios-elevated rounded-xl p-4 hover:bg-ios-surface transition-all border border-transparent hover:border-accent/20">
+            <div class="asset-card relative bg-ios-elevated rounded-xl p-4 hover:bg-ios-surface transition-all border border-transparent hover:border-accent/20">
+                <!-- 悬浮详情按钮 -->
+                <div class="absolute top-2 right-2">
+                    ${detailBtnHtml('asset', asset)}
+                </div>
                 <!-- 头部：币种图标 + 名称 + 估值 -->
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-3 pr-10">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-ios-surface flex items-center justify-center overflow-hidden">
                             <img src="${iconUrl}" 
@@ -903,7 +911,10 @@ function renderPendingOrdersTable() {
                 </td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${order.avg_px ? formatPrice(order.avg_px) : '-'}</td>
                 <td class="px-6 py-3.5">
-                    <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
+                        ${detailBtnHtml('pendingOrder', order)}
+                    </div>
                 </td>
             </tr>
             ${hasSlTp ? `
@@ -1403,7 +1414,12 @@ function renderBillsTable(bills, showAccountName = false) {
                 <td class="px-6 py-3.5 text-right font-mono text-sm font-semibold ${pnlClass}">${pnlText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${feeText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm font-semibold ${balChgClass}">${balChgText}</td>
-                <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${formatNumber(bill.bal)}</td>
+                <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">
+                    <div class="flex items-center justify-end gap-2">
+                        <span>${formatNumber(bill.bal)}</span>
+                        ${detailBtnHtml('bill', bill)}
+                    </div>
+                </td>
             </tr>
         `;
     }
@@ -1652,7 +1668,10 @@ function renderOrdersTable(orders, showAccountName = false) {
                 <td class="px-6 py-3.5 text-right font-mono text-sm font-semibold ${pnlClass}">${pnlText}</td>
                 <td class="px-6 py-3.5 text-right font-mono text-sm text-text-muted">${formatNumber(Math.abs(order.fee))}</td>
                 <td class="px-6 py-3.5 text-sm">
-                    <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
+                        ${detailBtnHtml('order', order)}
+                    </div>
                 </td>
             </tr>
         `;
@@ -1710,6 +1729,337 @@ function formatDateTimeLocal(date) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+// ========== 详情弹窗 ==========
+
+/**
+ * 字段配置：定义各数据类型的字段分组和格式化方式
+ */
+const DETAIL_FIELD_CONFIG = {
+    position: {
+        title: 'Position Detail',
+        groups: [
+            {
+                name: 'Basic',
+                fields: [
+                    { key: 'inst_id', label: 'Instrument' },
+                    { key: 'pos_side', label: 'Side', format: (v) => v === 'long' ? 'Long' : v === 'short' ? 'Short' : 'Net' },
+                    { key: 'pos', label: 'Size', format: (v) => Math.abs(v).toString() },
+                    { key: 'lever', label: 'Leverage', format: (v) => v + 'x' },
+                ],
+            },
+            {
+                name: 'Price',
+                fields: [
+                    { key: 'avg_px', label: 'Entry Price', format: formatPrice },
+                    { key: 'mark_px', label: 'Mark Price', format: formatPrice },
+                    { key: 'liq_px', label: 'Liquidation Price', format: (v) => v ? formatPrice(v) : '--' },
+                ],
+            },
+            {
+                name: 'PnL',
+                fields: [
+                    { key: 'upl', label: 'Unrealized PnL', format: (v) => '$' + formatNumber(v), className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'upl_ratio', label: 'PnL Ratio', format: (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%', className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'margin', label: 'Margin', format: (v) => '$' + formatNumber(v) },
+                ],
+            },
+            {
+                name: 'Raw Data',
+                fields: [
+                    { key: 'created_at', label: 'Open Time', format: formatDetailDateTime },
+                    { key: 'accountName', label: 'Account' },
+                ],
+            },
+        ],
+    },
+    asset: {
+        title: 'Asset Detail',
+        groups: [
+            {
+                name: 'Basic',
+                fields: [
+                    { key: 'ccy', label: 'Currency' },
+                ],
+            },
+            {
+                name: 'Balance',
+                fields: [
+                    { key: 'bal', label: 'Total Balance', format: formatAssetNumber },
+                    { key: 'avail_bal', label: 'Available', format: formatAssetNumber, className: () => 'profit' },
+                    { key: 'frozen_bal', label: 'Frozen', format: formatAssetNumber, className: (v) => v > 0 ? 'loss' : 'muted' },
+                ],
+            },
+            {
+                name: 'Valuation',
+                fields: [
+                    { key: 'eq', label: 'Equity (USDT)', format: (v) => '$' + formatNumber(v) },
+                    { key: 'eq_usd', label: 'Equity (USD)', format: (v) => v ? '$' + formatNumber(v) : '--' },
+                ],
+            },
+        ],
+    },
+    pendingOrder: {
+        title: 'Pending Order Detail',
+        groups: [
+            {
+                name: 'Basic',
+                fields: [
+                    { key: 'inst_id', label: 'Instrument' },
+                    { key: 'side', label: 'Side', format: (v) => v === 'buy' ? 'Buy' : 'Sell', className: (v) => v === 'buy' ? 'profit' : 'loss' },
+                    { key: 'pos_side', label: 'Position Side', format: formatDetailPosSide },
+                    { key: 'order_type', label: 'Order Type', format: formatDetailOrderType },
+                    { key: 'state', label: 'State', format: formatDetailOrderState },
+                    { key: 'lever', label: 'Leverage', format: (v) => v + 'x' },
+                ],
+            },
+            {
+                name: 'Price & Size',
+                fields: [
+                    { key: 'px', label: 'Order Price', format: (v) => v ? formatPrice(v) : 'Market' },
+                    { key: 'sz', label: 'Order Size' },
+                    { key: 'fill_sz', label: 'Filled Size', className: (v) => v > 0 ? 'profit' : 'muted' },
+                    { key: 'avg_px', label: 'Avg Fill Price', format: (v) => v ? formatPrice(v) : '--' },
+                ],
+            },
+            {
+                name: 'Stop Loss / Take Profit',
+                fields: [
+                    { key: 'sl_trigger_px', label: 'SL Trigger', format: (v) => v ? formatPrice(v) : '--' },
+                    { key: 'sl_ord_px', label: 'SL Order Price', format: (v) => v === -1 ? 'Market' : v ? formatPrice(v) : '--' },
+                    { key: 'tp_trigger_px', label: 'TP Trigger', format: (v) => v ? formatPrice(v) : '--' },
+                    { key: 'tp_ord_px', label: 'TP Order Price', format: (v) => v === -1 ? 'Market' : v ? formatPrice(v) : '--' },
+                ],
+            },
+            {
+                name: 'Raw Data',
+                fields: [
+                    { key: 'order_id', label: 'Order ID' },
+                    { key: 'created_at', label: 'Created', format: formatDetailDateTime },
+                    { key: 'updated_at', label: 'Updated', format: formatDetailDateTime },
+                    { key: 'accountName', label: 'Account' },
+                ],
+            },
+        ],
+    },
+    order: {
+        title: 'Order Detail',
+        groups: [
+            {
+                name: 'Basic',
+                fields: [
+                    { key: 'inst_id', label: 'Instrument' },
+                    { key: 'side', label: 'Side', format: (v) => v === 'buy' ? 'Buy' : 'Sell', className: (v) => v === 'buy' ? 'profit' : 'loss' },
+                    { key: 'pos_side', label: 'Position Side', format: formatDetailPosSide },
+                    { key: 'order_type', label: 'Order Type', format: formatDetailOrderType },
+                    { key: 'state', label: 'State', format: formatDetailOrderState },
+                ],
+            },
+            {
+                name: 'Price & Size',
+                fields: [
+                    { key: 'px', label: 'Order Price', format: (v) => v ? formatPrice(v) : 'Market' },
+                    { key: 'sz', label: 'Size' },
+                    { key: 'avg_px', label: 'Avg Fill Price', format: (v) => v ? formatPrice(v) : '--' },
+                ],
+            },
+            {
+                name: 'PnL & Fee',
+                fields: [
+                    { key: 'pnl', label: 'Realized PnL', format: (v) => v ? '$' + formatNumber(v) : '--', className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'fee', label: 'Fee', format: (v) => '$' + formatNumber(Math.abs(v)) },
+                ],
+            },
+            {
+                name: 'Raw Data',
+                fields: [
+                    { key: 'order_id', label: 'Order ID' },
+                    { key: 'created_at', label: 'Created', format: formatDetailDateTime },
+                    { key: 'updated_at', label: 'Updated', format: formatDetailDateTime },
+                    { key: 'accountName', label: 'Account' },
+                ],
+            },
+        ],
+    },
+    bill: {
+        title: 'Bill Detail',
+        groups: [
+            {
+                name: 'Basic',
+                fields: [
+                    { key: 'inst_id', label: 'Instrument', format: (v) => v || '--' },
+                    { key: 'ccy', label: 'Currency' },
+                    { key: 'bill_type', label: 'Type', format: formatDetailBillType },
+                    { key: 'sub_type', label: 'Sub Type', format: formatDetailBillSubType },
+                    { key: 'exec_type', label: 'Exec Type', format: (v) => v === 'T' ? 'Taker' : v === 'M' ? 'Maker' : '--' },
+                ],
+            },
+            {
+                name: 'Amount',
+                fields: [
+                    { key: 'sz', label: 'Size', format: (v) => v || '--' },
+                    { key: 'px', label: 'Price', format: (v) => v ? formatPrice(v) : '--' },
+                    { key: 'pnl', label: 'PnL', format: (v) => v ? '$' + formatNumber(v) : '--', className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'fee', label: 'Fee', format: (v) => v ? '$' + formatNumber(v) : '--' },
+                    { key: 'interest', label: 'Interest', format: (v) => v ? '$' + formatNumber(v) : '--' },
+                ],
+            },
+            {
+                name: 'Balance',
+                fields: [
+                    { key: 'bal_chg', label: 'Balance Change', format: (v) => (v >= 0 ? '+' : '') + formatNumber(v), className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'bal', label: 'Balance After', format: (v) => '$' + formatNumber(v) },
+                ],
+            },
+            {
+                name: 'Transfer',
+                fields: [
+                    { key: 'from_account', label: 'From', format: formatDetailAccountType },
+                    { key: 'to_account', label: 'To', format: formatDetailAccountType },
+                    { key: 'notes', label: 'Notes', format: (v) => v || '--' },
+                ],
+            },
+            {
+                name: 'Raw Data',
+                fields: [
+                    { key: 'bill_id', label: 'Bill ID' },
+                    { key: 'timestamp', label: 'Time', format: formatDetailDateTime },
+                    { key: 'accountName', label: 'Account' },
+                ],
+            },
+        ],
+    },
+};
+
+/**
+ * 详情弹窗格式化辅助函数
+ */
+function formatDetailDateTime(val) {
+    if (!val) return '--';
+    const d = typeof val === 'string' ? new Date(val) : val;
+    return d.toLocaleString('zh-CN');
+}
+
+function formatDetailPosSide(val) {
+    const map = { 'long': 'Long', 'short': 'Short', 'net': 'Net' };
+    return map[val] || val || '--';
+}
+
+function formatDetailOrderType(val) {
+    const map = { 'market': 'Market', 'limit': 'Limit', 'post_only': 'Post Only', 'fok': 'FOK', 'ioc': 'IOC' };
+    return map[val] || val || '--';
+}
+
+function formatDetailOrderState(val) {
+    const map = { 'live': 'Live', 'partially_filled': 'Partial', 'filled': 'Filled', 'canceled': 'Canceled' };
+    return map[val] || val || '--';
+}
+
+function formatDetailBillType(val) {
+    const map = { '1': 'Transfer', '2': 'Trade', '3': 'Delivery', '4': 'ADL', '5': 'Liquidation', '6': 'Margin Transfer', '7': 'Interest', '8': 'Funding Fee', '9': 'ADL', '22': 'Rebate' };
+    return map[val] || val || '--';
+}
+
+function formatDetailBillSubType(val) {
+    const map = {
+        '1': 'Buy', '2': 'Sell', '3': 'Open Long', '4': 'Open Short', '5': 'Close Long', '6': 'Close Short',
+        '100': 'Fee Deduct', '101': 'Fee Rebate', '102': 'Maker Rebate', '103': 'Taker Fee', '104': 'Maker Fee',
+        '173': 'Funding Paid', '174': 'Funding Received',
+    };
+    return map[val] || val || '--';
+}
+
+function formatDetailAccountType(val) {
+    const map = { '6': 'Funding', '18': 'Trading' };
+    return map[val] || val || '--';
+}
+
+/**
+ * 打开详情弹窗
+ */
+function showDetailModal(type, data) {
+    const config = DETAIL_FIELD_CONFIG[type];
+    if (!config) return;
+
+    const overlay = document.getElementById('detail-modal-overlay');
+    const modal = document.getElementById('detail-modal');
+    const title = document.getElementById('detail-modal-title');
+    const body = document.getElementById('detail-modal-body');
+
+    title.textContent = config.title;
+
+    // 生成内容
+    let html = '';
+    for (const group of config.groups) {
+        // 检查该组是否有任何有效数据
+        const hasData = group.fields.some(f => {
+            const val = data[f.key];
+            return val !== undefined && val !== null && val !== '';
+        });
+        if (!hasData) continue;
+
+        html += `<div class="field-group">`;
+        html += `<div class="field-group-title">${group.name}</div>`;
+        
+        for (const field of group.fields) {
+            const rawVal = data[field.key];
+            if (rawVal === undefined || rawVal === null) continue;
+
+            const displayVal = field.format ? field.format(rawVal) : rawVal;
+            const className = field.className ? field.className(rawVal) : '';
+
+            html += `
+                <div class="field-row">
+                    <span class="field-key">${field.label}</span>
+                    <span class="field-value ${className}">${displayVal}</span>
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+    }
+
+    body.innerHTML = html;
+
+    // 显示弹窗
+    overlay.classList.add('active');
+    modal.classList.add('active');
+
+    // ESC 关闭
+    document.addEventListener('keydown', handleModalEsc);
+}
+
+/**
+ * 关闭详情弹窗
+ */
+function closeDetailModal() {
+    const overlay = document.getElementById('detail-modal-overlay');
+    const modal = document.getElementById('detail-modal');
+    
+    overlay.classList.remove('active');
+    modal.classList.remove('active');
+
+    document.removeEventListener('keydown', handleModalEsc);
+}
+
+function handleModalEsc(e) {
+    if (e.key === 'Escape') {
+        closeDetailModal();
+    }
+}
+
+/**
+ * 生成详情按钮 HTML
+ */
+function detailBtnHtml(type, data) {
+    const jsonData = JSON.stringify(data).replace(/"/g, '&quot;');
+    return `
+        <button class="detail-btn px-2 py-1 text-xs text-text-muted hover:text-accent hover:bg-accent/10 rounded transition-all"
+                onclick="event.stopPropagation(); showDetailModal('${type}', JSON.parse(this.dataset.detail))"
+                data-detail="${jsonData}">
+            Detail
+        </button>
+    `;
+}
+
 // 启动应用
 init();
-
