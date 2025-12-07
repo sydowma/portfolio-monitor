@@ -151,6 +151,13 @@ class WebSocketManager:
             if pos == 0:
                 continue
 
+            # 解析开仓时间
+            created_at = None
+            if item.get("cTime"):
+                created_at = datetime.fromtimestamp(
+                    int(item.get("cTime")) / 1000, tz=timezone.utc
+                ).isoformat()
+
             positions.append({
                 "inst_id": item.get("instId", ""),
                 "pos_side": item.get("posSide", "net"),
@@ -161,6 +168,7 @@ class WebSocketManager:
                 "upl_ratio": float(item.get("uplRatio", 0) or 0),
                 "margin": float(item.get("margin", 0) or 0),
                 "lever": int(item.get("lever", 1) or 1),
+                "created_at": created_at,
             })
 
         # 缓存并广播

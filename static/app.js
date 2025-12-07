@@ -487,8 +487,11 @@ function renderPositionsTable() {
                     <span class="text-xs text-text-muted font-mono">${pos.lever}x</span>
                 </div>
 
-                <!-- 账户名称 -->
-                <div class="text-xs text-text-muted mb-3">${pos.accountName}</div>
+                <!-- 账户名称 + 开仓时间 -->
+                <div class="flex justify-between text-xs text-text-muted mb-3">
+                    <span>${pos.accountName}</span>
+                    <span>${formatOpenTime(pos.created_at)}</span>
+                </div>
 
                 <!-- 核心数据 -->
                 <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-3 text-xs">
@@ -1727,6 +1730,14 @@ function formatPrice(price) {
 function formatDateTimeLocal(date) {
     const pad = (n) => n.toString().padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatOpenTime(val) {
+    if (!val) return '--';
+    const d = typeof val === 'string' ? new Date(val) : val;
+    if (isNaN(d.getTime())) return '--';
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ========== 详情弹窗 ==========
