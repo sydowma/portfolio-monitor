@@ -10,7 +10,7 @@ from typing import Optional
 import httpx
 
 from config import AccountConfig
-from models import Balance, Position, Order, Bill, CurrencyAsset, PendingOrder
+from models import Balance, Position, Order, Bill, CurrencyAsset, PendingOrder, PositionHistory
 
 
 class OKXRestClient:
@@ -346,6 +346,98 @@ class OKXRestClient:
         last_id = bills[-1].bill_id if bills else None
 
         return bills, has_more, last_id
+
+    async def get_positions_history(
+        self,
+        inst_id: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        after: Optional[str] = None,
+        limit: int = 50,
+    ) -> tuple[list[PositionHistory], bool, Optional[str]]:
+        """
+        获取历史仓位（已平仓）
+        返回: (仓位列表, 是否有更多, 最后一条ID)
+        
+        注意: OKX API 不支持按方向(long/short)筛选，需要在前端过滤
+        """
+        # #region agent log
+        import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:entry","message":"Function entry","data":{"inst_id":inst_id,"start_time":str(start_time),"end_time":str(end_time),"after":after,"limit":limit},"hypothesisId":"A","timestamp":__import__('time').time()*1000})+'\n')
+        # #endregion
+        params = {
+            "instType": "SWAP",
+            "limit": str(min(limit, 100)),
+        }
+
+        if inst_id:
+            params["instId"] = inst_id
+        if start_time:
+            params["begin"] = str(int(start_time.timestamp() * 1000))
+        if end_time:
+            params["end"] = str(int(end_time.timestamp() * 1000))
+        if after:
+            params["after"] = after
+
+        # #region agent log
+        import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:before_request","message":"API params","data":{"params":params},"hypothesisId":"A","timestamp":__import__('time').time()*1000})+'\n')
+        # #endregion
+        try:
+            data = await self._request("GET", "/api/v5/account/positions-history", params)
+        except Exception as e:
+            # #region agent log
+            import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:api_error","message":"API request failed","data":{"error":str(e),"error_type":type(e).__name__},"hypothesisId":"A","timestamp":__import__('time').time()*1000})+'\n')
+            # #endregion
+            raise
+
+        # #region agent log
+        import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:after_request","message":"API response","data":{"data_len":len(data),"first_item":data[0] if data else None},"hypothesisId":"A,B,C,D","timestamp":__import__('time').time()*1000})+'\n')
+        # #endregion
+
+        positions = []
+        for idx, item in enumerate(data):
+            # #region agent log
+            import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:parsing_item","message":"Parsing item","data":{"idx":idx,"cTime":item.get("cTime"),"uTime":item.get("uTime"),"lever":item.get("lever"),"direction":item.get("direction")},"hypothesisId":"B,C,E","timestamp":__import__('time').time()*1000})+'\n')
+            # #endregion
+            try:
+                positions.append(PositionHistory(
+                    inst_id=item.get("instId", ""),
+                    inst_type=item.get("instType", "SWAP"),
+                    mgn_mode=item.get("mgnMode", "cross"),
+                    pos_side=item.get("direction", ""),  # API 返回 direction 字段
+                    lever=int(float(item.get("lever", 1) or 1)),  # OKX returns "10.0" format
+                    open_avg_px=float(item.get("openAvgPx", 0) or 0),
+                    close_avg_px=float(item.get("closeAvgPx", 0) or 0),
+                    open_max_pos=float(item.get("openMaxPos", 0) or 0),
+                    close_total_pos=float(item.get("closeTotalPos", 0) or 0),
+                    pnl=float(item.get("pnl", 0) or 0),
+                    pnl_ratio=float(item.get("pnlRatio", 0) or 0),
+                    realized_pnl=float(item.get("realizedPnl", 0) or 0),
+                    fee=float(item.get("fee", 0) or 0),
+                    funding_fee=float(item.get("fundingFee", 0) or 0),
+                    liq_penalty=float(item.get("liqPenalty", 0) or 0),
+                    ccy=item.get("ccy", "USDT"),
+                    uly=item.get("uly") or None,
+                    created_at=datetime.fromtimestamp(
+                        int(item.get("cTime", 0)) / 1000, tz=timezone.utc
+                    ),
+                    updated_at=datetime.fromtimestamp(
+                        int(item.get("uTime", 0)) / 1000, tz=timezone.utc
+                    ),
+                ))
+            except Exception as e:
+                # #region agent log
+                import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:parse_error","message":"Parse error","data":{"idx":idx,"error":str(e),"error_type":type(e).__name__,"item_keys":list(item.keys())},"hypothesisId":"B,C,D","timestamp":__import__('time').time()*1000})+'\n')
+                # #endregion
+                raise
+
+        has_more = len(data) >= limit
+        last_id = data[-1].get("posId") if data else None
+
+        # #region agent log
+        import json as _json; open('/Users/oker/GitHub/bot/portfolio-monitor/.cursor/debug.log','a').write(_json.dumps({"location":"rest_client.py:get_positions_history:exit","message":"Function exit","data":{"positions_count":len(positions),"has_more":has_more,"last_id":last_id},"hypothesisId":"A","timestamp":__import__('time').time()*1000})+'\n')
+        # #endregion
+
+        return positions, has_more, last_id
 
     async def close(self):
         """关闭客户端"""

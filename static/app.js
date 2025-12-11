@@ -22,6 +22,12 @@ const state = {
         cursors: [null],
         hasMore: false,
     },
+    // 历史仓位分页状态
+    posHistoryPagination: {
+        page: 1,
+        cursors: [null],
+        hasMore: false,
+    },
     // 资产曲线
     equityChart: null,
 };
@@ -70,6 +76,14 @@ const elements = {
     billsPrevBtn: document.getElementById('bills-prev-btn'),
     billsNextBtn: document.getElementById('bills-next-btn'),
     billsPageInfo: document.getElementById('bills-page-info'),
+    // 历史仓位
+    posHistoryContainer: document.getElementById('pos-history-container'),
+    noPosHistory: document.getElementById('no-pos-history'),
+    posHistoryLoading: document.getElementById('pos-history-loading'),
+    posHistoryPagination: document.getElementById('pos-history-pagination'),
+    posHistoryPrevBtn: document.getElementById('pos-history-prev-btn'),
+    posHistoryNextBtn: document.getElementById('pos-history-next-btn'),
+    posHistoryPageInfo: document.getElementById('pos-history-page-info'),
 };
 
 // WebSocket 连接
@@ -86,10 +100,14 @@ async function init() {
     // 设置默认时间范围（最近7天）
     const now = new Date();
     const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
     document.getElementById('order-start').value = formatDateTimeLocal(weekAgo);
     document.getElementById('order-end').value = formatDateTimeLocal(now);
     document.getElementById('bill-start').value = formatDateTimeLocal(weekAgo);
     document.getElementById('bill-end').value = formatDateTimeLocal(now);
+    // 历史仓位默认查询最近30天
+    document.getElementById('pos-history-start').value = formatDateTimeLocal(monthAgo);
+    document.getElementById('pos-history-end').value = formatDateTimeLocal(now);
 }
 
 /**
@@ -291,6 +309,11 @@ function selectAccount(accountId) {
         loadBills();
     } else if (currentTab === 'assets') {
         renderAssetsTable();
+    } else if (currentTab === 'position-history') {
+        // 历史仓位需要单账户
+        if (accountId !== null) {
+            loadPositionHistory();
+        }
     } else if (currentTab === 'equity-curve') {
         // 资产曲线需要单账户，切换时重新加载
         if (accountId !== null) {
@@ -313,6 +336,8 @@ function getCurrentTab() {
         return 'orders';
     } else if (!document.getElementById('view-bills').classList.contains('hidden')) {
         return 'bills';
+    } else if (!document.getElementById('view-position-history').classList.contains('hidden')) {
+        return 'position-history';
     } else if (!document.getElementById('view-equity-curve').classList.contains('hidden')) {
         return 'equity-curve';
     }
@@ -670,12 +695,14 @@ function switchTab(tab) {
     const viewPendingOrders = document.getElementById('view-pending-orders');
     const viewOrders = document.getElementById('view-orders');
     const viewBills = document.getElementById('view-bills');
+    const viewPositionHistory = document.getElementById('view-position-history');
     const viewEquityCurve = document.getElementById('view-equity-curve');
     const tabPositions = document.getElementById('tab-positions');
     const tabAssets = document.getElementById('tab-assets');
     const tabPendingOrders = document.getElementById('tab-pending-orders');
     const tabOrders = document.getElementById('tab-orders');
     const tabBills = document.getElementById('tab-bills');
+    const tabPositionHistory = document.getElementById('tab-position-history');
     const tabEquityCurve = document.getElementById('tab-equity-curve');
 
     const inactiveClass = 'tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all';
@@ -687,12 +714,14 @@ function switchTab(tab) {
     viewPendingOrders.classList.add('hidden');
     viewOrders.classList.add('hidden');
     viewBills.classList.add('hidden');
+    viewPositionHistory.classList.add('hidden');
     viewEquityCurve.classList.add('hidden');
     tabPositions.className = inactiveClass;
     tabAssets.className = inactiveClass;
     tabPendingOrders.className = inactiveClass;
     tabOrders.className = inactiveClass;
     tabBills.className = inactiveClass;
+    tabPositionHistory.className = inactiveClass;
     tabEquityCurve.className = inactiveClass;
 
     if (tab === 'positions') {
@@ -722,6 +751,13 @@ function switchTab(tab) {
         // 首次切换到账单页时加载账单
         if (elements.billsTable.children.length === 0) {
             loadBills();
+        }
+    } else if (tab === 'position-history') {
+        viewPositionHistory.classList.remove('hidden');
+        tabPositionHistory.className = activeClass;
+        // 首次切换时加载历史仓位
+        if (elements.posHistoryContainer.children.length === 0) {
+            loadPositionHistory();
         }
     } else if (tab === 'equity-curve') {
         viewEquityCurve.classList.remove('hidden');
@@ -1431,6 +1467,263 @@ function renderBillsTable(bills, showAccountName = false) {
 }
 
 /**
+ * 加载历史仓位（支持分页）
+ */
+async function loadPositionHistory(resetPage = true) {
+    // 必须选择单个账户
+    if (state.currentAccountId === null) {
+        // 默认选择第一个账户
+        if (state.accounts.length > 0) {
+            const firstAccountId = state.accounts[0].id;
+            selectAccount(firstAccountId);
+            return;
+        }
+        alert('请先选择一个账户');
+        return;
+    }
+
+    // 重置分页状态
+    if (resetPage) {
+        state.posHistoryPagination = { page: 1, cursors: [null], hasMore: false };
+    }
+
+    const startInput = document.getElementById('pos-history-start').value;
+    const endInput = document.getElementById('pos-history-end').value;
+    const instId = document.getElementById('pos-history-inst').value.trim();
+    const posSide = document.getElementById('pos-history-side').value;
+    const currentCursor = state.posHistoryPagination.cursors[state.posHistoryPagination.page - 1];
+
+    let url = `/api/accounts/${state.currentAccountId}/positions-history?limit=50`;
+    if (startInput) {
+        url += `&start=${new Date(startInput).toISOString()}`;
+    }
+    if (endInput) {
+        url += `&end=${new Date(endInput).toISOString()}`;
+    }
+    if (instId) {
+        url += `&inst_id=${encodeURIComponent(instId)}`;
+    }
+    if (posSide) {
+        url += `&pos_side=${posSide}`;
+    }
+    if (currentCursor) {
+        url += `&after=${currentCursor}`;
+    }
+
+    elements.posHistoryLoading.classList.remove('hidden');
+    elements.noPosHistory.classList.add('hidden');
+    elements.posHistoryContainer.innerHTML = '';
+    elements.posHistoryPagination.classList.add('hidden');
+
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        // 更新分页状态
+        state.posHistoryPagination.hasMore = data.has_more;
+        if (data.has_more && data.last_id) {
+            state.posHistoryPagination.cursors[state.posHistoryPagination.page] = data.last_id;
+        }
+
+        renderPositionHistoryCards(data.items);
+        updatePosHistoryPagination();
+    } catch (err) {
+        console.error('Failed to load position history:', err);
+        elements.posHistoryContainer.innerHTML = `<div class="col-span-full text-center text-loss py-8">加载失败: ${err.message}</div>`;
+    } finally {
+        elements.posHistoryLoading.classList.add('hidden');
+    }
+}
+
+/**
+ * 更新历史仓位分页控件状态
+ */
+function updatePosHistoryPagination() {
+    const { page, hasMore } = state.posHistoryPagination;
+
+    elements.posHistoryPagination.classList.remove('hidden');
+    elements.posHistoryPageInfo.textContent = `第 ${page} 页`;
+    elements.posHistoryPrevBtn.disabled = page <= 1;
+    elements.posHistoryNextBtn.disabled = !hasMore;
+}
+
+/**
+ * 历史仓位上一页
+ */
+function posHistoryPrevPage() {
+    if (state.posHistoryPagination.page > 1) {
+        state.posHistoryPagination.page--;
+        loadPositionHistory(false);
+    }
+}
+
+/**
+ * 历史仓位下一页
+ */
+function posHistoryNextPage() {
+    if (state.posHistoryPagination.hasMore) {
+        state.posHistoryPagination.page++;
+        loadPositionHistory(false);
+    }
+}
+
+/**
+ * 渲染历史仓位卡片
+ */
+function renderPositionHistoryCards(positions) {
+    if (positions.length === 0) {
+        elements.noPosHistory.classList.remove('hidden');
+        return;
+    }
+
+    elements.noPosHistory.classList.add('hidden');
+
+    let html = '';
+    for (const pos of positions) {
+        const isLong = pos.pos_side === 'long';
+        const directionText = isLong ? '多' : '空';
+        const directionClass = isLong ? 'text-profit' : 'text-loss';
+        const directionBgClass = isLong ? 'bg-profit/20' : 'bg-loss/20';
+        const borderClass = pos.pnl >= 0 ? 'border-profit/30' : 'border-loss/30';
+
+        // 盈亏
+        const pnlText = (pos.pnl >= 0 ? '+' : '') + formatNumber(pos.pnl);
+        const pnlClass = pos.pnl >= 0 ? 'text-profit' : 'text-loss';
+        const pnlGlow = pos.pnl >= 0 ? 'glow-profit' : 'glow-loss';
+
+        // 收益率
+        const pnlRatioText = (pos.pnl_ratio >= 0 ? '+' : '') + (pos.pnl_ratio * 100).toFixed(2) + '%';
+        const pnlRatioClass = pos.pnl_ratio >= 0 ? 'text-profit' : 'text-loss';
+
+        // 收益率进度条
+        const progressPercent = Math.min(Math.abs(pos.pnl_ratio * 100), 100);
+        const progressColor = pos.pnl_ratio >= 0 ? 'bg-profit' : 'bg-loss';
+
+        // 时间格式化
+        const openTime = formatPosHistoryTime(pos.created_at);
+        const closeTime = formatPosHistoryTime(pos.updated_at);
+
+        // 持仓时长
+        const duration = calculateDuration(pos.created_at, pos.updated_at);
+
+        // 手续费 + 资金费
+        const totalFee = (pos.fee || 0) + (pos.funding_fee || 0);
+
+        html += `
+            <div class="position-card relative bg-ios-elevated rounded-xl p-4 border ${borderClass} hover:bg-ios-surface transition-all">
+                <!-- 悬浮详情按钮 -->
+                <div class="absolute top-2 right-2">
+                    ${detailBtnHtml('positionHistory', pos)}
+                </div>
+                <!-- 头部：合约名 + 方向 + 杠杆 -->
+                <div class="flex items-center justify-between mb-3 pr-12">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-sm font-semibold text-text-primary">${pos.inst_id}</span>
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold ${directionClass} ${directionBgClass}">
+                            ${directionText}
+                        </span>
+                    </div>
+                    <span class="text-xs text-text-muted font-mono">${pos.lever}x</span>
+                </div>
+
+                <!-- 时间信息 -->
+                <div class="flex justify-between text-xs text-text-muted mb-3">
+                    <span>开仓: ${openTime}</span>
+                    <span>持仓: ${duration}</span>
+                </div>
+
+                <!-- 核心数据 -->
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-3 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">开仓价</span>
+                        <span class="font-mono text-text-secondary">${formatPrice(pos.open_avg_px)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">平仓价</span>
+                        <span class="font-mono text-text-primary">${formatPrice(pos.close_avg_px)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">最大持仓</span>
+                        <span class="font-mono text-text-secondary">${pos.open_max_pos}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">累计平仓</span>
+                        <span class="font-mono text-text-secondary">${pos.close_total_pos}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">手续费</span>
+                        <span class="font-mono text-text-muted">${formatNumber(Math.abs(pos.fee))}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">资金费</span>
+                        <span class="font-mono ${pos.funding_fee >= 0 ? 'text-profit' : 'text-loss'}">${pos.funding_fee >= 0 ? '+' : ''}${formatNumber(pos.funding_fee)}</span>
+                    </div>
+                </div>
+
+                <!-- 盈亏区域 -->
+                <div class="pt-3 border-t border-ios-separator">
+                    <div class="flex items-baseline justify-between mb-2">
+                        <span class="text-3xl font-mono font-bold ${pnlClass} ${pnlGlow}">$${pnlText}</span>
+                        <span class="text-sm font-mono font-semibold ${pnlRatioClass}">${pnlRatioText}</span>
+                    </div>
+                    <!-- 收益率进度条 -->
+                    <div class="h-1.5 bg-ios-surface rounded-full overflow-hidden">
+                        <div class="h-full ${progressColor} rounded-full transition-all" style="width: ${progressPercent}%"></div>
+                    </div>
+                    <!-- 平仓时间 -->
+                    <div class="text-xs text-text-muted mt-2 text-right">
+                        平仓: ${closeTime}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    elements.posHistoryContainer.innerHTML = html;
+}
+
+/**
+ * 格式化历史仓位时间
+ */
+function formatPosHistoryTime(val) {
+    if (!val) return '--';
+    const d = typeof val === 'string' ? new Date(val) : val;
+    if (isNaN(d.getTime())) return '--';
+    return d.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+/**
+ * 计算持仓时长
+ */
+function calculateDuration(start, end) {
+    if (!start || !end) return '--';
+    const startDate = typeof start === 'string' ? new Date(start) : start;
+    const endDate = typeof end === 'string' ? new Date(end) : end;
+    
+    const diffMs = endDate - startDate;
+    if (diffMs < 0) return '--';
+
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+        const hours = diffHours % 24;
+        return `${diffDays}天${hours}小时`;
+    } else if (diffHours > 0) {
+        const mins = diffMins % 60;
+        return `${diffHours}小时${mins}分`;
+    } else {
+        return `${diffMins}分钟`;
+    }
+}
+
+/**
  * 加载资产曲线数据
  */
 async function loadEquityCurve() {
@@ -1887,6 +2180,58 @@ const DETAIL_FIELD_CONFIG = {
                     { key: 'created_at', label: 'Created', format: formatDetailDateTime },
                     { key: 'updated_at', label: 'Updated', format: formatDetailDateTime },
                     { key: 'accountName', label: 'Account' },
+                ],
+            },
+        ],
+    },
+    positionHistory: {
+        title: 'Position History Detail',
+        groups: [
+            {
+                name: 'Basic',
+                fields: [
+                    { key: 'inst_id', label: 'Instrument' },
+                    { key: 'pos_side', label: 'Side', format: (v) => v === 'long' ? 'Long' : 'Short' },
+                    { key: 'lever', label: 'Leverage', format: (v) => v + 'x' },
+                    { key: 'mgn_mode', label: 'Margin Mode', format: (v) => v === 'cross' ? 'Cross' : 'Isolated' },
+                ],
+            },
+            {
+                name: 'Price',
+                fields: [
+                    { key: 'open_avg_px', label: 'Entry Price', format: formatPrice },
+                    { key: 'close_avg_px', label: 'Close Price', format: formatPrice },
+                ],
+            },
+            {
+                name: 'Size',
+                fields: [
+                    { key: 'open_max_pos', label: 'Max Position' },
+                    { key: 'close_total_pos', label: 'Closed Total' },
+                ],
+            },
+            {
+                name: 'PnL',
+                fields: [
+                    { key: 'pnl', label: 'Closed PnL', format: (v) => '$' + formatNumber(v), className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'pnl_ratio', label: 'PnL Ratio', format: (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%', className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'realized_pnl', label: 'Realized PnL', format: (v) => '$' + formatNumber(v), className: (v) => v >= 0 ? 'profit' : 'loss' },
+                ],
+            },
+            {
+                name: 'Fees',
+                fields: [
+                    { key: 'fee', label: 'Trading Fee', format: (v) => '$' + formatNumber(Math.abs(v)) },
+                    { key: 'funding_fee', label: 'Funding Fee', format: (v) => '$' + formatNumber(v), className: (v) => v >= 0 ? 'profit' : 'loss' },
+                    { key: 'liq_penalty', label: 'Liquidation Penalty', format: (v) => v ? '$' + formatNumber(v) : '--' },
+                ],
+            },
+            {
+                name: 'Time',
+                fields: [
+                    { key: 'created_at', label: 'Open Time', format: formatDetailDateTime },
+                    { key: 'updated_at', label: 'Close Time', format: formatDetailDateTime },
+                    { key: 'ccy', label: 'Settlement Currency' },
                 ],
             },
         ],

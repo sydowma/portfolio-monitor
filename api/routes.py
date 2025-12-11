@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from config import ACCOUNTS, get_account
-from models import AccountInfo, Balance, Position, Order, Bill, AccountSummary, PaginatedOrders, PaginatedBills, PendingOrder
+from models import AccountInfo, Balance, Position, Order, Bill, AccountSummary, PaginatedOrders, PaginatedBills, PendingOrder, PositionHistory, PaginatedPositionHistory
 from okx import OKXRestClient
 
 
@@ -163,6 +163,51 @@ async def get_bills(
             bill_type, inst_id, start_time, end_time, after, limit
         )
         return PaginatedBills(items=bills, has_more=has_more, last_id=last_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await client.close()
+
+
+@router.get("/accounts/{account_id}/positions-history", response_model=PaginatedPositionHistory)
+async def get_positions_history(
+    account_id: str,
+    inst_id: Optional[str] = Query(None, description="合约 ID，如 BTC-USDT-SWAP"),
+    pos_side: Optional[str] = Query(None, description="持仓方向: long/short (前端过滤)"),
+    start: Optional[str] = Query(None, description="开始时间 ISO 格式"),
+    end: Optional[str] = Query(None, description="结束时间 ISO 格式"),
+    after: Optional[str] = Query(None, description="分页游标"),
+    limit: int = Query(50, ge=1, le=100),
+):
+    """获取指定账户的历史仓位（已平仓）"""
+    account = get_account(account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    start_time = None
+    end_time = None
+
+    if start:
+        try:
+            start_time = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start time format")
+
+    if end:
+        try:
+            end_time = datetime.fromisoformat(end.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end time format")
+
+    client = OKXRestClient(account)
+    try:
+        positions, has_more, last_id = await client.get_positions_history(
+            inst_id, start_time, end_time, after, limit
+        )
+        # OKX API 不支持按方向筛选，在后端过滤
+        if pos_side:
+            positions = [p for p in positions if p.pos_side == pos_side]
+        return PaginatedPositionHistory(items=positions, has_more=has_more, last_id=last_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

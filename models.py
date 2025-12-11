@@ -137,3 +137,33 @@ class PaginatedBills(BaseModel):
     has_more: bool
     last_id: Optional[str] = None  # 用于请求下一页
 
+
+class PositionHistory(BaseModel):
+    """历史仓位（已平仓）"""
+    inst_id: str  # 合约ID
+    inst_type: str  # 产品类型: SWAP/FUTURES/MARGIN
+    mgn_mode: str  # 保证金模式: cross/isolated
+    pos_side: str  # 持仓方向: long/short/net
+    lever: int  # 杠杆倍数
+    open_avg_px: float  # 开仓均价
+    close_avg_px: float  # 平仓均价
+    open_max_pos: float  # 最大持仓量
+    close_total_pos: float  # 累计平仓量
+    pnl: float  # 平仓收益
+    pnl_ratio: float  # 收益率
+    realized_pnl: float  # 已实现收益
+    fee: float  # 手续费
+    funding_fee: float  # 资金费
+    liq_penalty: float  # 强平罚金
+    ccy: str  # 结算币种
+    uly: Optional[str] = None  # 标的指数
+    created_at: datetime  # 仓位创建时间
+    updated_at: datetime  # 最近更新时间（平仓时间）
+
+
+class PaginatedPositionHistory(BaseModel):
+    """分页历史仓位响应"""
+    items: list[PositionHistory]
+    has_more: bool
+    last_id: Optional[str] = None
+

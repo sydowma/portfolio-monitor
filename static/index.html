@@ -427,6 +427,9 @@
                 <button onclick="switchTab('bills')" id="tab-bills" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
                     账单流水
                 </button>
+                <button onclick="switchTab('position-history')" id="tab-position-history" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
+                    历史仓位
+                </button>
                 <button onclick="switchTab('equity-curve')" id="tab-equity-curve" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary hover:bg-glass-hover transition-all">
                     资产曲线
                 </button>
@@ -701,6 +704,67 @@
                             <div class="text-xs text-text-muted/60">选择时间范围查询账单流水</div>
                         </div>
                         <div id="bills-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <div>加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 历史仓位视图 -->
+                <div id="view-position-history" class="hidden space-y-5">
+                    <!-- 筛选条件 -->
+                    <div class="glass-light rounded-2xl p-5 fade-in">
+                        <div class="flex items-end gap-4 flex-wrap">
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">开始时间</label>
+                                <input type="datetime-local" id="pos-history-start" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">结束时间</label>
+                                <input type="datetime-local" id="pos-history-end" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">合约</label>
+                                <input type="text" id="pos-history-inst" placeholder="如 BTC-USDT-SWAP" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all w-48">
+                            </div>
+                            <div>
+                                <label class="text-xs text-text-muted block mb-2">方向</label>
+                                <select id="pos-history-side" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[100px]">
+                                    <option value="">全部</option>
+                                    <option value="long">多</option>
+                                    <option value="short">空</option>
+                                </select>
+                            </div>
+                            <button onclick="loadPositionHistory()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                                查询
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 仓位卡片容器 -->
+                    <div class="glass-light rounded-2xl overflow-hidden fade-in">
+                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                            <h3 class="text-xs text-text-muted uppercase tracking-wide">历史仓位</h3>
+                            <!-- 分页控件 -->
+                            <div id="pos-history-pagination" class="hidden flex items-center gap-2">
+                                <button onclick="posHistoryPrevPage()" id="pos-history-prev-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                    上一页
+                                </button>
+                                <span id="pos-history-page-info" class="text-xs text-text-muted px-2">第 1 页</span>
+                                <button onclick="posHistoryNextPage()" id="pos-history-next-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                    下一页
+                                </button>
+                            </div>
+                        </div>
+                        <div id="pos-history-container" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <!-- 动态生成卡片 -->
+                        </div>
+                        <div id="no-pos-history" class="hidden px-6 py-16 text-center text-text-muted text-sm">
+                            <div class="text-5xl mb-4 opacity-40">📜</div>
+                            <div class="text-base mb-1">暂无历史仓位</div>
+                            <div class="text-xs text-text-muted/60">选择时间范围查询已平仓记录</div>
+                        </div>
+                        <div id="pos-history-loading" class="hidden px-6 py-16 text-center text-text-muted text-sm">
                             <div class="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
                             <div>加载中...</div>
                         </div>
