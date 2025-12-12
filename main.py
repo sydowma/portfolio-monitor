@@ -58,7 +58,8 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             # 可以处理前端发来的消息，如手动刷新请求
             if data == "ping":
-                await websocket.send_text("pong")
+                # 统一使用 JSON，避免前端按 JSON 解析时报错
+                await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
 

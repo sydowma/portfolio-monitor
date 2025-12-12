@@ -2,6 +2,7 @@
 REST API 路由
 提供账户列表、资产、仓位、历史订单等接口
 """
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from collections import defaultdict
@@ -318,33 +319,37 @@ def _aggregate_by_day(points: list[EquityCurvePoint]) -> list[EquityCurvePoint]:
 @router.get("/summary", response_model=list[AccountSummary])
 async def get_all_accounts_summary():
     """获取所有账户的汇总信息 (资产 + 仓位)"""
-    summaries = []
+    # 有限并发：避免账户数增长时串行慢，也避免对 OKX 造成尖峰压力
+    semaphore = asyncio.Semaphore(5)
 
-    for account in ACCOUNTS:
-        client = OKXRestClient(account)
-        try:
-            balance = await client.get_balance()
-            positions = await client.get_positions()
-            summaries.append(AccountSummary(
-                account=AccountInfo(
-                    id=account.id,
-                    name=account.name,
-                    simulated=account.simulated,
-                ),
-                balance=balance,
-                positions=positions,
-            ))
-        except Exception as e:
-            summaries.append(AccountSummary(
-                account=AccountInfo(
-                    id=account.id,
-                    name=account.name,
-                    simulated=account.simulated,
-                ),
-                error=str(e),
-            ))
-        finally:
-            await client.close()
+    async def fetch_one(account) -> AccountSummary:
+        async with semaphore:
+            client = OKXRestClient(account)
+            try:
+                balance, positions = await asyncio.gather(
+                    client.get_balance(),
+                    client.get_positions(),
+                )
+                return AccountSummary(
+                    account=AccountInfo(
+                        id=account.id,
+                        name=account.name,
+                        simulated=account.simulated,
+                    ),
+                    balance=balance,
+                    positions=positions,
+                )
+            except Exception as e:
+                return AccountSummary(
+                    account=AccountInfo(
+                        id=account.id,
+                        name=account.name,
+                        simulated=account.simulated,
+                    ),
+                    error=str(e),
+                )
+            finally:
+                await client.close()
 
-    return summaries
+    return await asyncio.gather(*(fetch_one(account) for account in ACCOUNTS))
 

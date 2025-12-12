@@ -88,6 +88,8 @@ const elements = {
 
 // WebSocket 连接
 let ws = null;
+let wsPingTimer = null;
+let wsReconnectTimer = null;
 
 /**
  * 初始化应用
@@ -154,6 +156,20 @@ function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
 
+    // 清理旧连接与定时器，避免重连后叠加心跳
+    if (ws) {
+        try { ws.close(); } catch (_) {}
+        ws = null;
+    }
+    if (wsPingTimer) {
+        clearInterval(wsPingTimer);
+        wsPingTimer = null;
+    }
+    if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = null;
+    }
+
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -166,7 +182,11 @@ function connectWebSocket() {
         state.wsConnected = false;
         updateWsStatus(false);
         console.log('WebSocket disconnected, reconnecting...');
-        setTimeout(connectWebSocket, 3000);
+        if (wsPingTimer) {
+            clearInterval(wsPingTimer);
+            wsPingTimer = null;
+        }
+        wsReconnectTimer = setTimeout(connectWebSocket, 3000);
     };
 
     ws.onerror = (err) => {
@@ -174,6 +194,8 @@ function connectWebSocket() {
     };
 
     ws.onmessage = (event) => {
+        // 后端可能返回心跳响应
+        if (event.data === 'pong') return;
         try {
             const msg = JSON.parse(event.data);
             handleWsMessage(msg);
@@ -183,7 +205,7 @@ function connectWebSocket() {
     };
 
     // 心跳
-    setInterval(() => {
+    wsPingTimer = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send('ping');
         }
