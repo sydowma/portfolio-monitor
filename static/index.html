@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="macos">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,24 +15,29 @@
                 extend: {
                     colors: {
                         'ios': {
-                            'bg': '#000000',
-                            'surface': '#1c1c1e',
-                            'elevated': '#2c2c2e',
-                            'separator': 'rgba(84, 84, 88, 0.65)',
+                            'bg': 'rgb(var(--c-bg) / <alpha-value>)',
+                            'surface': 'rgb(var(--c-surface) / <alpha-value>)',
+                            'elevated': 'rgb(var(--c-elevated) / <alpha-value>)',
+                            // separator 通常不需要 /xx 修饰，内置默认透明度即可
+                            'separator': 'rgb(var(--c-separator) / var(--a-separator))',
                         },
                         'glass': {
-                            'bg': 'rgba(255, 255, 255, 0.05)',
-                            'border': 'rgba(255, 255, 255, 0.08)',
-                            'hover': 'rgba(255, 255, 255, 0.08)',
+                            'bg': 'rgb(var(--c-glass-bg) / var(--a-glass-bg))',
+                            'border': 'rgb(var(--c-glass-border) / var(--a-glass-border))',
+                            'hover': 'rgb(var(--c-glass-hover) / var(--a-glass-hover))',
                         },
-                        'accent': '#007AFF',
-                        'profit': '#34C759',
-                        'loss': '#FF3B30',
+                        'accent': 'rgb(var(--c-accent) / <alpha-value>)',
+                        'profit': 'rgb(var(--c-profit) / <alpha-value>)',
+                        'loss': 'rgb(var(--c-loss) / <alpha-value>)',
+                        'warning': 'rgb(var(--c-warning) / <alpha-value>)',
+                        'funding': 'rgb(var(--c-funding) / <alpha-value>)',
+                        'transfer': 'rgb(var(--c-transfer) / <alpha-value>)',
                         'text': {
-                            'primary': '#ffffff',
-                            'secondary': '#ebebf5',
-                            'tertiary': '#ebebf599',
-                            'muted': '#8e8e93',
+                            'primary': 'rgb(var(--c-text-primary) / <alpha-value>)',
+                            'secondary': 'rgb(var(--c-text-secondary) / <alpha-value>)',
+                            // 三级文字通常固定较低 alpha，更接近系统层级
+                            'tertiary': 'rgb(var(--c-text-tertiary) / 0.60)',
+                            'muted': 'rgb(var(--c-text-muted) / <alpha-value>)',
                         }
                     },
                     fontFamily: {
@@ -43,10 +48,176 @@
             }
         }
     </script>
+    <script>
+        // 主题预加载：避免刷新时闪一下默认主题（FOUC）
+        (function () {
+            try {
+                const key = 'pm-theme';
+                const saved = localStorage.getItem(key);
+                if (saved === 'macos' || saved === 'ios') {
+                    document.documentElement.dataset.theme = saved;
+                }
+            } catch (_) {
+                // ignore
+            }
+        })();
+    </script>
     <style>
-        /* iOS 深色背景 */
+        :root { color-scheme: dark; }
+
+        /* ========= Theme tokens (RGB triples for Tailwind /<alpha> support) ========= */
+        html[data-theme="macos"] {
+            /* Base */
+            --c-bg: 0 0 0;
+            --c-surface: 28 28 30;
+            --c-elevated: 44 44 46;
+            --c-separator: 84 84 88;
+            --a-separator: 0.55;
+
+            /* Semantic */
+            /* Dark-mode system colors (closer to iOS/macOS system palette) */
+            --c-accent: 10 132 255;    /* #0A84FF */
+            --c-profit: 48 209 88;     /* #30D158 */
+            --c-loss: 255 69 58;       /* #FF453A */
+            --c-warning: 255 214 10;   /* #FFD60A */
+            --c-funding: 94 92 230;    /* #5E5CE6 */
+            --c-transfer: 100 210 255; /* #64D2FF */
+
+            /* Text */
+            --c-text-primary: 255 255 255;
+            --c-text-secondary: 235 235 245;
+            --c-text-tertiary: 235 235 245;
+            --c-text-muted: 142 142 147;
+
+            /* Tailwind "glass" colors */
+            --c-glass-bg: 255 255 255;
+            --a-glass-bg: 0.05;
+            --c-glass-border: 255 255 255;
+            --a-glass-border: 0.08;
+            --c-glass-hover: 255 255 255;
+            --a-glass-hover: 0.06;
+
+            /* Materials */
+            --mat-a-bg: 28 28 30;
+            --mat-a-alpha: 0.86;
+            --mat-a-blur: 24px;
+            --mat-a-sat: 170%;
+            --mat-a-border-alpha: 0.10;
+            --mat-a-highlight-alpha: 0.04;
+            --mat-a-shadow: 0 0 0 rgb(0 0 0 / 0);
+
+            --mat-b-bg: 28 28 30;
+            --mat-b-alpha: 0.70;
+            --mat-b-blur: 18px;
+            --mat-b-sat: 160%;
+            --mat-b-border-alpha: 0.10;
+            --mat-b-highlight-alpha: 0.04;
+            --mat-b-shadow: 0 8px 32px rgb(0 0 0 / 0.32);
+            --mat-b-shadow-hover: 0 12px 44px rgb(0 0 0 / 0.38);
+
+            --modal-bg: 32 32 36;
+            --modal-alpha: 0.92;
+            --modal-blur: 28px;
+            --modal-sat: 180%;
+            --modal-border-alpha: 0.10;
+            --modal-shadow: 0 30px 120px rgb(0 0 0 / 0.55);
+            --modal-overlay-alpha: 0.65;
+
+            /* Small controls */
+            --chip-alpha: 0.60;
+            --chip-border-alpha: 0.10;
+            --chip-highlight-alpha: 0.06;
+
+            /* UI overlays */
+            --scrollbar-thumb-alpha: 0.14;
+            --scrollbar-thumb-hover-alpha: 0.22;
+            --row-hover-alpha: 0.035;
+            --row-odd-alpha: 0.012;
+            --row-odd-hover-alpha: 0.045;
+
+            /* Background glows (subtle on macOS) */
+            --bg-glow-1-alpha: 0.06;
+            --bg-glow-2-alpha: 0.05;
+            --bg-glow-3-alpha: 0.04;
+
+            /* Effects */
+            --hover-lift: -0.5px;
+            --noise-opacity: 0.06;
+        }
+
+        html[data-theme="ios"] {
+            --c-bg: 0 0 0;
+            --c-surface: 28 28 30;
+            --c-elevated: 44 44 46;
+            --c-separator: 84 84 88;
+            --a-separator: 0.65;
+
+            --c-accent: 10 132 255;
+            --c-profit: 48 209 88;
+            --c-loss: 255 69 58;
+            --c-warning: 255 214 10;
+            --c-funding: 94 92 230;
+            --c-transfer: 100 210 255;
+
+            --c-text-primary: 255 255 255;
+            --c-text-secondary: 235 235 245;
+            --c-text-tertiary: 235 235 245;
+            --c-text-muted: 142 142 147;
+
+            --c-glass-bg: 255 255 255;
+            --a-glass-bg: 0.06;
+            --c-glass-border: 255 255 255;
+            --a-glass-border: 0.10;
+            --c-glass-hover: 255 255 255;
+            --a-glass-hover: 0.09;
+
+            --mat-a-bg: 28 28 30;
+            --mat-a-alpha: 0.78;
+            --mat-a-blur: 30px;
+            --mat-a-sat: 200%;
+            --mat-a-border-alpha: 0.10;
+            --mat-a-highlight-alpha: 0.06;
+            --mat-a-shadow: 0 0 0 rgb(0 0 0 / 0);
+
+            /* iOS: 更“透”、blur 更强，但保持深色玻璃一致性 */
+            --mat-b-bg: 28 28 30;
+            --mat-b-alpha: 0.58;
+            --mat-b-blur: 26px;
+            --mat-b-sat: 210%;
+            --mat-b-border-alpha: 0.12;
+            --mat-b-highlight-alpha: 0.07;
+            --mat-b-shadow: 0 16px 60px rgb(0 0 0 / 0.40);
+            --mat-b-shadow-hover: 0 22px 80px rgb(0 0 0 / 0.48);
+
+            --modal-bg: 44 44 46;
+            --modal-alpha: 0.95;
+            --modal-blur: 32px;
+            --modal-sat: 210%;
+            --modal-border-alpha: 0.12;
+            --modal-shadow: 0 30px 120px rgb(0 0 0 / 0.55);
+            --modal-overlay-alpha: 0.60;
+
+            --chip-alpha: 0.50;
+            --chip-border-alpha: 0.12;
+            --chip-highlight-alpha: 0.08;
+
+            --scrollbar-thumb-alpha: 0.16;
+            --scrollbar-thumb-hover-alpha: 0.26;
+            --row-hover-alpha: 0.04;
+            --row-odd-alpha: 0.015;
+            --row-odd-hover-alpha: 0.05;
+
+            --bg-glow-1-alpha: 0.10;
+            --bg-glow-2-alpha: 0.08;
+            --bg-glow-3-alpha: 0.07;
+
+            --hover-lift: -1px;
+            --noise-opacity: 0.10;
+        }
+
+        /* 深色背景 */
         body {
-            background: #000000;
+            background: rgb(var(--c-bg) / 1);
             min-height: 100vh;
             position: relative;
             overflow-x: hidden;
@@ -64,7 +235,7 @@
         .bg-glow-1 {
             width: 800px;
             height: 800px;
-            background: radial-gradient(circle, rgba(0, 122, 255, 0.08) 0%, transparent 70%);
+            background: radial-gradient(circle, rgb(var(--c-accent) / var(--bg-glow-1-alpha)) 0%, transparent 70%);
             top: -300px;
             right: -200px;
             animation: drift 30s ease-in-out infinite;
@@ -73,7 +244,7 @@
         .bg-glow-2 {
             width: 600px;
             height: 600px;
-            background: radial-gradient(circle, rgba(88, 86, 214, 0.06) 0%, transparent 70%);
+            background: radial-gradient(circle, rgb(88 86 214 / var(--bg-glow-2-alpha)) 0%, transparent 70%);
             bottom: -200px;
             left: -150px;
             animation: drift 35s ease-in-out infinite reverse;
@@ -82,7 +253,7 @@
         .bg-glow-3 {
             width: 500px;
             height: 500px;
-            background: radial-gradient(circle, rgba(175, 82, 222, 0.05) 0%, transparent 70%);
+            background: radial-gradient(circle, rgb(175 82 222 / var(--bg-glow-3-alpha)) 0%, transparent 70%);
             top: 40%;
             left: 30%;
             animation: drift 40s ease-in-out infinite;
@@ -95,38 +266,71 @@
             75% { transform: translate(-25px, -15px); }
         }
 
-        /* iOS 玻璃效果 */
-        .glass {
-            background: rgba(28, 28, 30, 0.8);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 0.5px solid rgba(255, 255, 255, 0.08);
+        /* ========= Frosted materials ========= */
+        .glass,
+        .glass-light,
+        .modal-content {
+            position: relative;
+            isolation: isolate;
         }
 
+        .glass::before,
+        .glass-light::before,
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: inherit;
+            z-index: -1;
+            opacity: var(--noise-opacity);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            background-size: 180px 180px;
+        }
+
+        /* Material A: Sidebar / Topbar */
+        .glass {
+            background: rgb(var(--mat-a-bg) / var(--mat-a-alpha));
+            backdrop-filter: blur(var(--mat-a-blur)) saturate(var(--mat-a-sat));
+            -webkit-backdrop-filter: blur(var(--mat-a-blur)) saturate(var(--mat-a-sat));
+            border: 0.5px solid rgb(255 255 255 / var(--mat-a-border-alpha));
+            box-shadow:
+                inset 0 1px 0 rgb(255 255 255 / var(--mat-a-highlight-alpha)),
+                var(--mat-a-shadow);
+        }
+
+        /* Material B: Content surfaces */
         .glass-light {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 0.5px solid rgba(255, 255, 255, 0.1);
+            background: rgb(var(--mat-b-bg) / var(--mat-b-alpha));
+            backdrop-filter: blur(var(--mat-b-blur)) saturate(var(--mat-b-sat));
+            -webkit-backdrop-filter: blur(var(--mat-b-blur)) saturate(var(--mat-b-sat));
+            border: 0.5px solid rgb(255 255 255 / var(--mat-b-border-alpha));
+            box-shadow:
+                inset 0 1px 0 rgb(255 255 255 / var(--mat-b-highlight-alpha)),
+                var(--mat-b-shadow);
         }
 
         .glass-hover {
-            transition: all 0.25s ease;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
         }
 
         .glass-hover:hover {
-            background: rgba(255, 255, 255, 0.08);
-            transform: translateY(-1px);
+            transform: translateY(var(--hover-lift));
+            border-color: rgb(255 255 255 / calc(var(--mat-b-border-alpha) + 0.06));
+            box-shadow:
+                inset 0 1px 0 rgb(255 255 255 / calc(var(--mat-b-highlight-alpha) + 0.06)),
+                var(--mat-b-shadow-hover);
         }
 
         /* iOS 风格按钮 */
         .btn-ios {
-            background: #007AFF;
+            background: rgb(var(--c-accent) / 1);
             transition: all 0.2s ease;
         }
 
         .btn-ios:hover {
-            background: #0066d6;
+            background: color-mix(in srgb, rgb(var(--c-accent) / 1) 88%, black);
             transform: scale(0.98);
         }
 
@@ -157,8 +361,8 @@
         /* iOS 风格滚动条 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+        ::-webkit-scrollbar-thumb { background: rgb(255 255 255 / var(--scrollbar-thumb-alpha)); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgb(255 255 255 / var(--scrollbar-thumb-hover-alpha)); }
 
         /* 输入框样式 */
         input[type="datetime-local"],
@@ -172,25 +376,25 @@
         }
 
         .table-row-hover:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: rgb(255 255 255 / var(--row-hover-alpha));
         }
 
         /* 表格斑马纹 */
         .table-row-hover:nth-child(odd) {
-            background: rgba(255, 255, 255, 0.02);
+            background: rgb(255 255 255 / var(--row-odd-alpha));
         }
 
         .table-row-hover:nth-child(odd):hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgb(255 255 255 / var(--row-odd-hover-alpha));
         }
 
         /* 盈亏高亮背景 */
         .profit-highlight {
-            background: rgba(52, 199, 89, 0.08);
+            background: rgb(var(--c-profit) / 0.08);
         }
 
         .loss-highlight {
-            background: rgba(255, 59, 48, 0.08);
+            background: rgb(var(--c-loss) / 0.08);
         }
 
         /* 慢速弹跳动画 */
@@ -205,18 +409,18 @@
 
         /* iOS 分隔线 */
         .ios-separator {
-            border-color: rgba(84, 84, 88, 0.65);
+            border-color: rgb(var(--c-separator) / var(--a-separator));
         }
 
         /* 标签激活状态 */
         .tab-active {
-            background: #007AFF;
-            color: white;
+            background: rgb(var(--c-accent) / 1);
+            color: rgb(var(--c-text-primary) / 1);
         }
 
         /* 柔和的文字发光 */
-        .glow-profit { text-shadow: 0 0 20px rgba(52, 199, 89, 0.3); }
-        .glow-loss { text-shadow: 0 0 20px rgba(255, 59, 48, 0.3); }
+        .glow-profit { text-shadow: 0 0 20px rgb(var(--c-profit) / 0.30); }
+        .glow-loss { text-shadow: 0 0 20px rgb(var(--c-loss) / 0.30); }
 
         /* 悬浮详情按钮 */
         .detail-btn {
@@ -234,7 +438,7 @@
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgb(0 0 0 / var(--modal-overlay-alpha));
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
             z-index: 100;
@@ -270,17 +474,20 @@
         }
 
         .modal-content {
-            background: rgba(44, 44, 46, 0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 0.5px solid rgba(255, 255, 255, 0.1);
+            background: rgb(var(--modal-bg) / var(--modal-alpha));
+            backdrop-filter: blur(var(--modal-blur)) saturate(var(--modal-sat));
+            -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(var(--modal-sat));
+            border: 0.5px solid rgb(255 255 255 / var(--modal-border-alpha));
+            box-shadow:
+                inset 0 1px 0 rgb(255 255 255 / 0.10),
+                var(--modal-shadow);
             border-radius: 20px;
             overflow: hidden;
         }
 
         .modal-header {
             padding: 20px 24px;
-            border-bottom: 0.5px solid rgba(84, 84, 88, 0.65);
+            border-bottom: 0.5px solid rgb(var(--c-separator) / var(--a-separator));
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -296,7 +503,7 @@
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgb(255 255 255 / 0.10);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -305,7 +512,7 @@
         }
 
         .modal-close:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgb(255 255 255 / 0.20);
         }
 
         /* 字段分组 */
@@ -321,10 +528,10 @@
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: #8e8e93;
+            color: rgb(var(--c-text-muted) / 1);
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 0.5px solid rgba(84, 84, 88, 0.4);
+            border-bottom: 0.5px solid rgb(var(--c-separator) / 0.40);
         }
 
         .field-row {
@@ -335,27 +542,60 @@
         }
 
         .field-row:not(:last-child) {
-            border-bottom: 0.5px solid rgba(84, 84, 88, 0.3);
+            border-bottom: 0.5px solid rgb(var(--c-separator) / 0.30);
         }
 
         .field-key {
             font-size: 13px;
-            color: #8e8e93;
+            color: rgb(var(--c-text-muted) / 1);
             flex-shrink: 0;
             margin-right: 16px;
         }
 
         .field-value {
             font-size: 13px;
-            color: #ebebf5;
+            color: rgb(var(--c-text-secondary) / 1);
             font-family: 'SF Mono', Monaco, monospace;
             text-align: right;
             word-break: break-all;
         }
 
-        .field-value.profit { color: #34C759; }
-        .field-value.loss { color: #FF3B30; }
-        .field-value.muted { color: #8e8e93; }
+        .field-value.profit { color: rgb(var(--c-profit) / 1); }
+        .field-value.loss { color: rgb(var(--c-loss) / 1); }
+        .field-value.muted { color: rgb(var(--c-text-muted) / 1); }
+
+        /* Toolbar chips (no nested blur; better for Chrome/macOS perf) */
+        .toolbar-chip {
+            background: rgb(var(--c-elevated) / var(--chip-alpha));
+            border: 0.5px solid rgb(255 255 255 / var(--chip-border-alpha));
+            box-shadow: inset 0 1px 0 rgb(255 255 255 / var(--chip-highlight-alpha));
+        }
+
+        /* Theme segmented */
+        .theme-toggle-btn {
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1;
+            color: rgb(var(--c-text-muted) / 1);
+            transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+            user-select: none;
+        }
+
+        html[data-theme="macos"] .theme-toggle-btn[data-theme-value="macos"],
+        html[data-theme="ios"] .theme-toggle-btn[data-theme-value="ios"] {
+            background: rgb(255 255 255 / 0.10);
+            color: rgb(var(--c-text-primary) / 1);
+            box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+        }
+
+        /* Reduce motion */
+        @media (prefers-reduced-motion: reduce) {
+            .bg-glow-1, .bg-glow-2, .bg-glow-3 { animation: none !important; }
+            .pulse-dot, .fade-in, .animate-bounce-slow { animation: none !important; }
+            .glass-hover, .btn-ios { transition: none !important; }
+        }
     </style>
 </head>
 <body class="font-sans text-text-primary">
@@ -434,7 +674,11 @@
                     资产曲线
                 </button>
                 <div class="flex-1"></div>
-                <span id="current-account-name" class="text-sm text-text-muted px-4 py-2 glass-light rounded-lg">全部账户</span>
+                <div id="theme-toggle" class="toolbar-chip rounded-lg p-0.5 flex items-center mr-2" role="group" aria-label="Theme">
+                    <button type="button" class="theme-toggle-btn" data-theme-value="macos" aria-pressed="true">macOS</button>
+                    <button type="button" class="theme-toggle-btn" data-theme-value="ios" aria-pressed="false">iOS</button>
+                </div>
+                <span id="current-account-name" class="text-sm text-text-muted px-4 py-2 toolbar-chip rounded-lg">全部账户</span>
             </div>
 
             <!-- 内容区域 -->

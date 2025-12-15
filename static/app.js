@@ -30,6 +30,7 @@ const state = {
     },
     // 资产曲线
     equityChart: null,
+    equityCurvePoints: null,
 };
 
 // DOM 元素
@@ -84,7 +85,79 @@ const elements = {
     posHistoryPrevBtn: document.getElementById('pos-history-prev-btn'),
     posHistoryNextBtn: document.getElementById('pos-history-next-btn'),
     posHistoryPageInfo: document.getElementById('pos-history-page-info'),
+    // 主题切换
+    themeToggle: document.getElementById('theme-toggle'),
 };
+
+// ========== Theme ==========
+
+const THEME_STORAGE_KEY = 'pm-theme';
+
+function normalizeTheme(theme) {
+    return theme === 'ios' ? 'ios' : 'macos';
+}
+
+function getCssVarTriplet(varName) {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    if (!raw) return null;
+    const parts = raw.split(/\s+/).map((v) => Number(v)).filter((n) => !Number.isNaN(n));
+    return parts.length === 3 ? parts : null;
+}
+
+function rgbaFromTriplet(triplet, alpha) {
+    const [r, g, b] = triplet;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function cssRgba(varName, alpha) {
+    const t = getCssVarTriplet(varName);
+    return t ? rgbaFromTriplet(t, alpha) : `rgba(255, 255, 255, ${alpha})`;
+}
+
+function refreshThemeSensitiveUI() {
+    // Chart.js 颜色是 JS 配置的：主题切换时需要重绘
+    if (state.equityChart && Array.isArray(state.equityCurvePoints) && state.equityCurvePoints.length > 0) {
+        renderEquityChart(state.equityCurvePoints);
+    }
+}
+
+function getTheme() {
+    const t = document.documentElement.dataset.theme;
+    return t === 'ios' || t === 'macos' ? t : 'macos';
+}
+
+function applyTheme(theme, persist = true) {
+    const t = normalizeTheme(theme);
+    document.documentElement.dataset.theme = t;
+    if (persist) {
+        try { localStorage.setItem(THEME_STORAGE_KEY, t); } catch (_) {}
+    }
+    updateThemeToggleAria(t);
+    refreshThemeSensitiveUI();
+}
+
+function updateThemeToggleAria(theme) {
+    const root = elements.themeToggle;
+    if (!root) return;
+    const btns = root.querySelectorAll('[data-theme-value]');
+    btns.forEach((btn) => {
+        const isActive = btn.dataset.themeValue === theme;
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+
+function setupThemeToggle() {
+    if (!elements.themeToggle) return;
+
+    // 同步 aria 状态（主题在 <head> 里已预加载）
+    updateThemeToggleAria(getTheme());
+
+    elements.themeToggle.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-theme-value]');
+        if (!btn) return;
+        applyTheme(btn.dataset.themeValue, true);
+    });
+}
 
 // WebSocket 连接
 let ws = null;
@@ -293,7 +366,7 @@ function renderAccountList() {
                         <span class="text-base group-hover:scale-110 transition-transform">${account.simulated ? '🎮' : '💰'}</span>
                         <span class="font-medium">${account.name}</span>
                     </div>
-                    ${account.simulated ? '<span class="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">模拟</span>' : ''}
+                    ${account.simulated ? '<span class="text-xs px-1.5 py-0.5 rounded bg-warning/20 text-warning">模拟</span>' : ''}
                 </div>
                 <div class="flex items-center justify-between mt-1.5 ml-6">
                     <span class="text-xs ${isActive ? 'text-white/70' : 'text-text-muted'} font-mono">$${equity}</span>
@@ -444,7 +517,7 @@ function renderBalanceCard() {
         if (marginRatio > 80) {
             elements.marginRatioBar.className = 'h-full bg-loss rounded-full transition-all';
         } else if (marginRatio > 50) {
-            elements.marginRatioBar.className = 'h-full bg-yellow-500 rounded-full transition-all';
+            elements.marginRatioBar.className = 'h-full bg-warning rounded-full transition-all';
         } else {
             elements.marginRatioBar.className = 'h-full bg-accent rounded-full transition-all';
         }
@@ -1455,8 +1528,8 @@ function renderBillsTable(bills, showAccountName = false) {
         // 账单类型颜色
         let typeClass = 'bg-ios-elevated';
         if (bill.bill_type === '2') typeClass = 'bg-accent/15 text-accent'; // 交易
-        else if (bill.bill_type === '8') typeClass = 'bg-purple-500/15 text-purple-400'; // 资金费
-        else if (bill.bill_type === '1') typeClass = 'bg-blue-500/15 text-blue-400'; // 划转
+        else if (bill.bill_type === '8') typeClass = 'bg-funding/15 text-funding'; // 资金费
+        else if (bill.bill_type === '1') typeClass = 'bg-transfer/15 text-transfer'; // 划转
 
         html += `
             <tr class="table-row-hover ${rowHighlight}">
@@ -1782,6 +1855,7 @@ async function loadEquityCurve() {
                 state.equityChart.destroy();
                 state.equityChart = null;
             }
+            state.equityCurvePoints = null;
             // 清除汇总数据
             document.getElementById('equity-start').textContent = '--';
             document.getElementById('equity-end').textContent = '--';
@@ -1807,10 +1881,12 @@ async function loadEquityCurve() {
         document.getElementById('equity-points').textContent = data.total_points;
 
         // 渲染图表
+        state.equityCurvePoints = data.points;
         renderEquityChart(data.points);
 
     } catch (err) {
         console.error('Failed to load equity curve:', err);
+        state.equityCurvePoints = null;
         noDataEl.classList.remove('hidden');
     } finally {
         loadingEl.classList.add('hidden');
@@ -1842,8 +1918,9 @@ function renderEquityChart(points) {
 
     // 计算颜色（根据起止变化）
     const isProfit = data[data.length - 1] >= data[0];
-    const lineColor = isProfit ? '#34C759' : '#FF3B30';
-    const fillColor = isProfit ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)';
+    const lineVar = isProfit ? '--c-profit' : '--c-loss';
+    const lineColor = cssRgba(lineVar, 1);
+    const fillColor = cssRgba(lineVar, 0.12);
 
     state.equityChart = new Chart(ctx, {
         type: 'line',
@@ -1860,7 +1937,7 @@ function renderEquityChart(points) {
                 pointRadius: points.length > 100 ? 0 : 3,
                 pointHoverRadius: 5,
                 pointBackgroundColor: lineColor,
-                pointBorderColor: '#1c1c1e',
+                pointBorderColor: cssRgba('--c-surface', 1),
                 pointBorderWidth: 2,
             }]
         },
@@ -1876,10 +1953,10 @@ function renderEquityChart(points) {
                     display: false,
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(28, 28, 30, 0.95)',
-                    titleColor: '#ebebf5',
-                    bodyColor: '#ffffff',
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    backgroundColor: cssRgba('--c-surface', 0.95),
+                    titleColor: cssRgba('--c-text-secondary', 1),
+                    bodyColor: cssRgba('--c-text-primary', 1),
+                    borderColor: cssRgba('--c-glass-border', 0.12),
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
@@ -1898,22 +1975,22 @@ function renderEquityChart(points) {
             scales: {
                 x: {
                     grid: {
-                        color: 'rgba(84, 84, 88, 0.3)',
+                        color: cssRgba('--c-separator', 0.30),
                         drawBorder: false,
                     },
                     ticks: {
-                        color: '#8e8e93',
+                        color: cssRgba('--c-text-muted', 1),
                         maxTicksLimit: 8,
                         maxRotation: 0,
                     }
                 },
                 y: {
                     grid: {
-                        color: 'rgba(84, 84, 88, 0.3)',
+                        color: cssRgba('--c-separator', 0.30),
                         drawBorder: false,
                     },
                     ticks: {
-                        color: '#8e8e93',
+                        color: cssRgba('--c-text-muted', 1),
                         callback: function(value) {
                             return '$' + formatNumber(value);
                         }
@@ -2440,4 +2517,5 @@ function detailBtnHtml(type, data) {
 }
 
 // 启动应用
+setupThemeToggle();
 init();
