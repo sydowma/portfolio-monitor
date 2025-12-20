@@ -94,7 +94,7 @@ const elements = {
 const THEME_STORAGE_KEY = 'pm-theme';
 
 function normalizeTheme(theme) {
-    return theme === 'ios' ? 'ios' : 'macos';
+    return theme === 'light' ? 'light' : 'dark';
 }
 
 function getCssVarTriplet(varName) {
@@ -123,7 +123,7 @@ function refreshThemeSensitiveUI() {
 
 function getTheme() {
     const t = document.documentElement.dataset.theme;
-    return t === 'ios' || t === 'macos' ? t : 'macos';
+    return t === 'light' || t === 'dark' ? t : 'dark';
 }
 
 function applyTheme(theme, persist = true) {
@@ -151,6 +151,9 @@ function setupThemeToggle() {
 
     // 同步 aria 状态（主题在 <head> 里已预加载）
     updateThemeToggleAria(getTheme());
+    
+    // 强制同步一次主题，确保 Chart.js 等组件获取到最新的 CSS 变量
+    applyTheme(getTheme(), false);
 
     elements.themeToggle.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-theme-value]');
@@ -346,7 +349,7 @@ function renderAccountList() {
                     <span class="text-base group-hover:scale-110 transition-transform">📊</span>
                     <span class="font-medium">全部账户</span>
                 </span>
-                <span class="text-xs ${state.currentAccountId === null ? 'text-white/70' : 'text-text-muted'} px-2 py-0.5 ${state.currentAccountId === null ? 'bg-white/20' : 'bg-ios-elevated'} rounded-full">${state.accounts.length}</span>
+                <span class="text-xs ${state.currentAccountId === null ? 'text-white/70' : 'text-text-muted'} px-2 py-0.5 ${state.currentAccountId === null ? 'bg-white/20' : 'bg-app-elevated'} rounded-full">${state.accounts.length}</span>
             </div>
         </button>
     `;
@@ -587,7 +590,7 @@ function renderPositionsTable() {
         const liqPxText = pos.liq_px ? formatPrice(pos.liq_px) : '--';
 
         html += `
-            <div class="position-card relative bg-ios-elevated rounded-xl p-4 border ${borderClass} hover:bg-ios-surface transition-all">
+            <div class="position-card relative bg-app-elevated rounded-xl p-4 border ${borderClass} hover:bg-app-surface transition-all">
                 <!-- 悬浮详情按钮 -->
                 <div class="absolute top-2 right-2">
                     ${detailBtnHtml('position', pos)}
@@ -630,13 +633,13 @@ function renderPositionsTable() {
                 </div>
 
                 <!-- 盈亏区域 -->
-                <div class="pt-3 border-t border-ios-separator">
+                <div class="pt-3 border-t border-app-separator">
                     <div class="flex items-baseline justify-between mb-2">
                         <span class="text-3xl font-mono font-bold ${uplClass} ${uplGlow}">$${uplText}</span>
                         <span class="text-sm font-mono font-semibold ${uplRatioClass}">${uplRatioText}</span>
                     </div>
                     <!-- 收益率进度条 -->
-                    <div class="h-1.5 bg-ios-surface rounded-full overflow-hidden">
+                    <div class="h-1.5 bg-app-surface rounded-full overflow-hidden">
                         <div class="h-full ${progressColor} rounded-full transition-all" style="width: ${progressPercent}%"></div>
                     </div>
                 </div>
@@ -707,7 +710,7 @@ function renderAssetsTable() {
         const availRatio = asset.bal > 0 ? (asset.avail_bal / asset.bal) * 100 : 100;
         
         html += `
-            <div class="asset-card relative bg-ios-elevated rounded-xl p-4 hover:bg-ios-surface transition-all border border-transparent hover:border-accent/20">
+            <div class="asset-card relative bg-app-elevated rounded-xl p-4 hover:bg-app-surface transition-all border border-transparent hover:border-accent/20">
                 <!-- 悬浮详情按钮 -->
                 <div class="absolute top-2 right-2">
                     ${detailBtnHtml('asset', asset)}
@@ -715,7 +718,7 @@ function renderAssetsTable() {
                 <!-- 头部：币种图标 + 名称 + 估值 -->
                 <div class="flex items-center justify-between mb-3 pr-10">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-ios-surface flex items-center justify-center overflow-hidden">
+                        <div class="w-10 h-10 rounded-full bg-app-surface flex items-center justify-center overflow-hidden">
                             <img src="${iconUrl}" 
                                  alt="${asset.ccy}" 
                                  class="w-7 h-7"
@@ -752,12 +755,12 @@ function renderAssetsTable() {
                 </div>
 
                 <!-- 可用比例进度条 -->
-                <div class="mt-3 pt-3 border-t border-ios-separator">
+                <div class="mt-3 pt-3 border-t border-app-separator">
                     <div class="flex justify-between items-center text-xs mb-1.5">
                         <span class="text-text-muted">可用比例</span>
                         <span class="font-mono text-text-secondary">${availRatio.toFixed(1)}%</span>
                     </div>
-                    <div class="h-1.5 bg-ios-surface rounded-full overflow-hidden">
+                    <div class="h-1.5 bg-app-surface rounded-full overflow-hidden">
                         <div class="h-full bg-accent rounded-full transition-all" style="width: ${availRatio}%"></div>
                     </div>
                 </div>
@@ -973,7 +976,7 @@ function renderPendingOrdersTable() {
         const stateText = stateMap[order.state] || order.state;
 
         // 状态颜色
-        const stateClass = order.state === 'partially_filled' ? 'bg-accent/20 text-accent' : 'bg-ios-elevated';
+        const stateClass = order.state === 'partially_filled' ? 'bg-accent/20 text-accent' : 'bg-app-elevated';
 
         // 时间格式化（兼容 ISO 字符串和毫秒时间戳）
         let timeStr = '-';
@@ -1021,7 +1024,7 @@ function renderPendingOrdersTable() {
         }
 
         html += `
-            <tr class="table-row-hover border-b border-ios-separator">
+            <tr class="table-row-hover border-b border-app-separator">
                 <td class="px-6 py-3.5 text-sm">
                     ${timeStr}
                     ${showAccountName ? `<div class="text-xs text-text-muted mt-1">${order.accountName}</div>` : ''}
@@ -1048,7 +1051,7 @@ function renderPendingOrdersTable() {
                 </td>
             </tr>
             ${hasSlTp ? `
-            <tr class="bg-ios-surface/50">
+            <tr class="bg-app-surface/50">
                 <td colspan="9" class="px-6 py-2">
                     <div class="flex items-center gap-6 text-xs">
                         ${order.sl_trigger_px ? `
@@ -1522,7 +1525,7 @@ function renderBillsTable(bills, showAccountName = false) {
         }
 
         // 账单类型颜色
-        let typeClass = 'bg-ios-elevated';
+        let typeClass = 'bg-app-elevated';
         if (bill.bill_type === '2') typeClass = 'bg-accent/15 text-accent'; // 交易
         else if (bill.bill_type === '8') typeClass = 'bg-funding/15 text-funding'; // 资金费
         else if (bill.bill_type === '1') typeClass = 'bg-transfer/15 text-transfer'; // 划转
@@ -1701,7 +1704,7 @@ function renderPositionHistoryCards(positions) {
         const totalFee = (pos.fee || 0) + (pos.funding_fee || 0);
 
         html += `
-            <div class="position-card relative bg-ios-elevated rounded-xl p-4 border ${borderClass} hover:bg-ios-surface transition-all">
+            <div class="position-card relative bg-app-elevated rounded-xl p-4 border ${borderClass} hover:bg-app-surface transition-all">
                 <!-- 悬浮详情按钮 -->
                 <div class="absolute top-2 right-2">
                     ${detailBtnHtml('positionHistory', pos)}
@@ -1752,13 +1755,13 @@ function renderPositionHistoryCards(positions) {
                 </div>
 
                 <!-- 盈亏区域 -->
-                <div class="pt-3 border-t border-ios-separator">
+                <div class="pt-3 border-t border-app-separator">
                     <div class="flex items-baseline justify-between mb-2">
                         <span class="text-3xl font-mono font-bold ${pnlClass} ${pnlGlow}">$${pnlText}</span>
                         <span class="text-sm font-mono font-semibold ${pnlRatioClass}">${pnlRatioText}</span>
                     </div>
                     <!-- 收益率进度条 -->
-                    <div class="h-1.5 bg-ios-surface rounded-full overflow-hidden">
+                    <div class="h-1.5 bg-app-surface rounded-full overflow-hidden">
                         <div class="h-full ${progressColor} rounded-full transition-all" style="width: ${progressPercent}%"></div>
                     </div>
                     <!-- 平仓时间 -->
@@ -2032,7 +2035,7 @@ function renderOrdersTable(orders, showAccountName = false) {
         };
         const stateText = stateMap[order.state] || order.state;
         const stateClass = order.state === 'filled' ? 'bg-profit/15 text-profit' : 
-                          order.state === 'canceled' ? 'bg-loss/15 text-loss' : 'bg-ios-elevated';
+                          order.state === 'canceled' ? 'bg-loss/15 text-loss' : 'bg-app-elevated';
 
         const pnlText = order.pnl ? ((order.pnl >= 0 ? '+' : '') + formatNumber(order.pnl)) : '-';
         const pnlClass = order.pnl >= 0 ? 'text-profit' : 'text-loss';

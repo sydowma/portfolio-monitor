@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="macos">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio Monitor</title>
+    <title>Portfolio Monitor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,7 +14,7 @@
             theme: {
                 extend: {
                     colors: {
-                        'ios': {
+                        'app': {
                             'bg': 'rgb(var(--c-bg) / <alpha-value>)',
                             'surface': 'rgb(var(--c-surface) / <alpha-value>)',
                             'elevated': 'rgb(var(--c-elevated) / <alpha-value>)',
@@ -54,10 +54,10 @@
             try {
                 const key = 'pm-theme';
                 const saved = localStorage.getItem(key);
-                if (saved === 'macos' || saved === 'ios') {
+                if (saved === 'dark' || saved === 'light') {
                     document.documentElement.dataset.theme = saved;
                 } else {
-                    document.documentElement.dataset.theme = 'ios';
+                    document.documentElement.dataset.theme = 'light';
                 }
             } catch (_) {
                 // ignore
@@ -69,152 +69,142 @@
 
         /* ========= VisionOS / macOS 26 Design System ========= */
         
-        html[data-theme="macos"] {
-            /* Dark Mode - Deep Space (优化：色调统一) */
-            --c-bg-grad-start: 10 10 12;   /* 更深 */
-            --c-bg-grad-end: 18 18 24;     /* 偏冷 */
+        html[data-theme="dark"] {
+            /* Dark Mode - True Pro Black */
+            --c-bg-grad-start: 5 5 10;      /* 微蓝的黑 */
+            --c-bg-grad-end: 15 15 18;      /* 深空灰 */
             
-            --c-surface: 30 30 35;
-            --c-elevated: 45 45 50;
-            --c-separator: 255 255 255;
-            --a-separator: 0.10;
+            --c-surface: 28 28 30;
+            --c-elevated: 44 44 46;
+            --c-separator: 80 80 85;
+            --a-separator: 0.2;
 
-            /* Vision Pro Colors */
+            /* Store Colors */
             --c-accent: 10 132 255;
             --c-profit: 48 209 88;
             --c-loss: 255 69 58;
-            --c-warning: 255 214 10;   
+            --c-warning: 255 214 10;
             --c-funding: 175 82 222;
-            --c-transfer: 100 210 255; 
+            --c-transfer: 100 210 255;
 
             /* Text */
             --c-text-primary: 255 255 255;
-            --c-text-secondary: 235 235 245;
-            --c-text-tertiary: 160 160 170;
-            --c-text-muted: 120 120 130;
+            --c-text-secondary: 142 142 147;
+            --c-text-tertiary: 99 99 102;
+            --c-text-muted: 99 99 102;
 
-            /* Glass Materials (Dark - 优化：更黑更透，融入背景) */
-            --glass-base-bg: 20 20 25;     /* 侧边栏更深 */
-            --glass-base-alpha: 0.40;
-            --glass-border-alpha: 0.12;
-            --glass-blur: 50px;
+            /* Glass Materials (Invisible Black Glass) */
+            --glass-base-bg: 10 10 10;     /* Sidebar 接近纯黑 */
+            --glass-base-alpha: 0.8;
+            --glass-border-alpha: 0.0;
+            --glass-blur: 60px;
             
-            --glass-card-bg: 25 25 32;     /* 卡片不再是纯灰，带一点蓝黑 */
-            --glass-card-alpha: 0.30;      /* 更透 (0.4 -> 0.3) */
-            --glass-card-border-alpha: 0.15;
+            --glass-card-bg: 28 28 30;     /* 使用更标准的 Apple System Gray */
+            --glass-card-alpha: 0.55;      /* 更透 (0.7 -> 0.55) */
+            --glass-card-border-alpha: 0.1;
             
-            --glass-hover-bg: 255 255 255;
-            --glass-hover-alpha: 0.05;
+            --glass-hover-bg: 44 44 46;
+            --glass-hover-alpha: 0.8;
             
-            /* Shadows */
-            --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3); /* 阴影加深，增强层次 */
+            /* Shadows - Stronger for depth */
+            --shadow-card: 0 24px 60px rgba(0, 0, 0, 0.6);
             
-            /* Glows */
-            --glow-1: 10 132 255;
-            --glow-2: 94 92 230;
-            --glow-3: 255 45 85;
-            --glow-opacity: 0.20;          /* 稍微降低光斑亮度 */
+            /* Glows - Subtle */
+            --glow-1: 10 80 255;
+            --glow-2: 255 80 20;
+            --glow-3: 10 80 255;
+            --glow-opacity: 0.12;
             
-            /* Tailwind Compat */
-            --c-bg: 10 10 12;
-            --c-glass-hover: 255 255 255;
-            --a-glass-hover: 0.05;
-            --c-glass-bg: 25 25 32;
-            --a-glass-bg: 0.30;
-            
-            /* Legacy Compat */
-            --mat-a-bg: 20 20 25;
-            --mat-a-alpha: 0.40;
-            --mat-a-blur: 50px;
-            --mat-b-bg: 25 25 32;
-            --mat-b-alpha: 0.30;
-            
-            /* Modal */
-            --modal-bg: 25 25 30;
-            --modal-alpha: 0.85;
-            --modal-blur: 50px;
+            /* Compat */
+            --c-bg: 5 5 10;
+            --c-glass-hover: 44 44 46;
+            --a-glass-hover: 0.8;
+            --c-glass-bg: 28 28 30;
+            --a-glass-bg: 0.55;
+            --mat-a-bg: 10 10 10;
+            --mat-a-alpha: 0.8;
+            --mat-a-blur: 60px;
+            --mat-b-bg: 28 28 30;
+            --mat-b-alpha: 0.55;
+            --modal-bg: 28 28 30;
+            --modal-alpha: 0.95;
+            --modal-blur: 60px;
             --modal-sat: 180%;
             --modal-border-alpha: 0.15;
-            --modal-shadow: 0 40px 120px rgba(0,0,0,0.6);
-            --modal-overlay-alpha: 0.7;
+            --modal-shadow: 0 50px 120px rgba(0,0,0,0.8);
+            --modal-overlay-alpha: 0.85;
             
-            /* Misc */
-            --hover-lift: -2px;
-            --noise-opacity: 0.03;
+            --hover-lift: -4px;
+            --noise-opacity: 0;
         }
 
-        html[data-theme="ios"] {
-            /* Light Mode - 优化：柔和护眼 */
-            --c-bg-grad-start: 235 235 240; /* 降低亮度 (F2 -> EB) */
-            --c-bg-grad-end: 245 245 250;
+        html[data-theme="light"] {
+            /* Light Mode - Holiday Ice Blue (显著增强蓝色) */
+            --c-bg-grad-start: 200 230 255; /* 更明显的冰蓝色 (215 -> 200) */
+            --c-bg-grad-end: 240 245 255;   
             
             --c-surface: 255 255 255;
             --c-elevated: 255 255 255;
-            --c-separator: 20 20 30;       /* 深色分隔线更清晰 */
-            --a-separator: 0.06;
+            --c-separator: 0 70 150;        /* 分隔线带一点蓝 */
+            --a-separator: 0.08;
 
-            /* Vivid Colors */
-            --c-accent: 0 110 255;         /* 稍微加深蓝色，提高可读性 */
-            --c-profit: 40 180 70;         /* 稍微加深绿色 */
-            --c-loss: 255 59 48;
+            /* Store Colors */
+            --c-accent: 0 113 227;     /* Apple Store Blue */
+            --c-profit: 0 160 60;      /* 深绿，在亮色背景更清晰 */
+            --c-loss: 230 50 40;       /* 深红 */
             --c-warning: 255 149 0;
             --c-funding: 175 82 222;
-            --c-transfer: 88 86 214;
+            --c-transfer: 0 113 227;
 
             /* Text */
-            --c-text-primary: 0 0 0;
-            --c-text-secondary: 60 60 67;
-            --c-text-tertiary: 100 100 110;
-            --c-text-muted: 130 130 135;
+            --c-text-primary: 20 20 30;    /* 深蓝黑 */
+            --c-text-secondary: 80 90 110; /* 蓝灰 */
+            --c-text-tertiary: 120 130 150;
+            --c-text-muted: 130 140 160;
 
-            /* Glass Materials (Light - 优化：减少刺眼白光) */
-            --glass-base-bg: 245 245 250;  /* 侧边栏微灰 */
-            --glass-base-alpha: 0.60;
-            --glass-border-alpha: 0.08;
-            --glass-blur: 50px;
+            /* Glass Materials (Crystal Clear) */
+            --glass-base-bg: 255 255 255;
+            --glass-base-alpha: 0.30;      /* 非常透 (0.4 -> 0.3) */
+            --glass-border-alpha: 0.3;     /* 增加边框可见度 */
+            --glass-blur: 60px;
             
             --glass-card-bg: 255 255 255;
-            --glass-card-alpha: 0.45;      /* 降低不透明度 (0.55 -> 0.45) */
-            --glass-card-border-alpha: 0.4;
+            --glass-card-alpha: 0.55;      /* 磨砂白卡片 (0.65 -> 0.55) */
+            --glass-card-border-alpha: 0.7;
             
             --glass-hover-bg: 255 255 255;
-            --glass-hover-alpha: 0.3;
+            --glass-hover-alpha: 0.85;
             
-            /* Shadows */
-            --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04); /* 更柔和的阴影 */
+            /* Shadows - Soft Blue Tint */
+            --shadow-card: 0 8px 30px rgba(0, 60, 150, 0.12); /* 增加阴影浓度 */
 
-            /* Glows */
-            --glow-1: 0 122 255;
-            --glow-2: 52 199 89;
-            --glow-3: 255 149 0;
-            --glow-opacity: 0.08;          /* 大幅降低光斑不透明度 (0.15 -> 0.08) */
+            /* Glows (Stronger Blue & Orange) */
+            --glow-1: 0 113 227;       /* Blue */
+            --glow-2: 255 120 50;      /* Orange */
+            --glow-3: 0 113 227;
+            --glow-opacity: 0.20;      /* 增强光效可见度 */
             
-            /* Tailwind Compat */
-            --c-bg: 235 235 240;
+            /* Compat */
+            --c-bg: 220 240 255;
             --c-glass-hover: 255 255 255;
-            --a-glass-hover: 0.3;
+            --a-glass-hover: 0.85;
             --c-glass-bg: 255 255 255;
-            --a-glass-bg: 0.45;
-            
-            /* Legacy Compat */
-            --mat-a-bg: 245 245 250;
-            --mat-a-alpha: 0.60;
-            --mat-a-blur: 50px;
+            --a-glass-bg: 0.55;
+            --mat-a-bg: 255 255 255;
+            --mat-a-alpha: 0.30;
+            --mat-a-blur: 60px;
             --mat-b-bg: 255 255 255;
-            --mat-b-alpha: 0.45;
-
-            /* Modal */
-            --modal-bg: 250 250 255;
-            --modal-alpha: 0.92;
-            --modal-blur: 40px;
+            --mat-b-alpha: 0.55;
+            --modal-bg: 255 255 255;
+            --modal-alpha: 0.95;
+            --modal-blur: 60px;
             --modal-sat: 180%;
-            --modal-border-alpha: 0.2;
-            --modal-shadow: 0 20px 60px rgba(0,0,0,0.15);
-            --modal-overlay-alpha: 0.2;
+            --modal-border-alpha: 0.0;
+            --modal-shadow: 0 30px 80px rgba(0,40,100,0.15);
+            --modal-overlay-alpha: 0.3;
             
-            /* Misc */
-            --hover-lift: -2px;
-            --noise-opacity: 0.015;
+            --hover-lift: -4px;
+            --noise-opacity: 0;
         }
 
         body {
@@ -319,7 +309,7 @@
             border-radius: 24px;
         }
         
-        html[data-theme="macos"] .glass-light {
+        html[data-theme="dark"] .glass-light {
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-top: 1px solid rgba(255, 255, 255, 0.18);
         }
@@ -337,7 +327,7 @@
         }
 
         /* Buttons (iOS Style) */
-        .btn-ios {
+        .btn-primary {
             background: rgb(var(--c-accent) / 1);
             color: white;
             border-radius: 100px;
@@ -346,13 +336,13 @@
             font-weight: 500;
         }
 
-        .btn-ios:hover {
+        .btn-primary:hover {
             transform: translateY(-1px);
             box-shadow: 0 8px 16px rgb(var(--c-accent) / 0.5);
             filter: brightness(1.1);
         }
 
-        .btn-ios:active {
+        .btn-primary:active {
             transform: scale(0.96);
         }
 
@@ -376,12 +366,12 @@
             font-weight: 600;
         }
         
-        html[data-theme="macos"] .tab-active {
+        html[data-theme="dark"] .tab-active {
             background: rgba(255,255,255,0.15) !important;
         }
 
         /* Separator */
-        .ios-separator {
+        .app-separator {
             border-color: rgb(var(--c-separator) / var(--a-separator)) !important;
         }
         
@@ -393,8 +383,8 @@
         }
 
         /* Pulse */
-        .pulse-dot { animation: pulse-ios 2s ease-in-out infinite; }
-        @keyframes pulse-ios {
+        .pulse-dot { animation: pulse-app 2s ease-in-out infinite; }
+        @keyframes pulse-app {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.9); }
         }
@@ -523,20 +513,20 @@
             background: rgba(0,0,0,0.05);
             border: 1px solid rgba(255,255,255,0.2);
         }
-        html[data-theme="macos"] #theme-toggle {
+        html[data-theme="dark"] #theme-toggle {
             background: rgba(255,255,255,0.1);
         }
         .theme-toggle-btn {
             padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
             color: rgb(var(--c-text-muted) / 1); transition: all 0.2s ease;
         }
-        html[data-theme="macos"] .theme-toggle-btn[data-theme-value="macos"],
-        html[data-theme="ios"] .theme-toggle-btn[data-theme-value="ios"] {
+        html[data-theme="dark"] .theme-toggle-btn[data-theme-value="dark"],
+        html[data-theme="light"] .theme-toggle-btn[data-theme-value="light"] {
             background: rgb(255 255 255 / 1);
             color: black;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
-        html[data-theme="macos"] .theme-toggle-btn[data-theme-value="macos"] {
+        html[data-theme="dark"] .theme-toggle-btn[data-theme-value="dark"] {
             background: rgb(60 60 65 / 1);
             color: white;
             border: 1px solid rgba(255,255,255,0.1);
@@ -568,7 +558,7 @@
         <!-- 侧边栏 -->
         <aside class="w-72 glass flex flex-col">
             <!-- Logo -->
-            <div class="p-6 border-b ios-separator">
+            <div class="p-6 border-b app-separator">
                 <h1 class="text-xl font-semibold text-text-primary">Portfolio Monitor</h1>
                 <p class="text-xs text-text-muted mt-2 flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
@@ -577,13 +567,13 @@
             </div>
 
             <!-- 连接状态 -->
-            <div class="px-6 py-4 border-b ios-separator flex items-center gap-3">
+            <div class="px-6 py-4 border-b app-separator flex items-center gap-3">
                 <span id="ws-status" class="w-2 h-2 rounded-full bg-loss pulse-dot"></span>
                 <span id="ws-status-text" class="text-sm text-text-muted">连接中...</span>
             </div>
 
             <!-- 汇总信息 -->
-            <div class="p-6 border-b ios-separator">
+            <div class="p-6 border-b app-separator">
                 <div class="text-xs text-text-muted uppercase tracking-wide mb-2">总资产 (USDT)</div>
                 <div id="total-equity" class="text-3xl font-semibold text-text-primary font-mono">--</div>
                 <div class="flex items-center gap-3 mt-4">
@@ -601,8 +591,8 @@
             </div>
 
             <!-- 刷新按钮 -->
-            <div class="p-4 border-t ios-separator">
-                <button onclick="refreshData()" class="w-full py-3 px-4 btn-ios rounded-xl text-sm font-medium text-white">
+            <div class="p-4 border-t app-separator">
+                <button onclick="refreshData()" class="w-full py-3 px-4 btn-primary rounded-xl text-sm font-medium text-white">
                     刷新数据
                 </button>
             </div>
@@ -611,7 +601,7 @@
         <!-- 主内容区 -->
         <main class="flex-1 overflow-hidden flex flex-col">
             <!-- 顶部标签栏 -->
-            <div class="glass border-b ios-separator px-6 py-4 flex items-center gap-2">
+            <div class="glass border-b app-separator px-6 py-4 flex items-center gap-2">
                 <button onclick="switchTab('positions')" id="tab-positions" class="tab-btn px-5 py-2 rounded-lg text-sm font-medium tab-active transition-all">
                     仓位
                 </button>
@@ -635,8 +625,8 @@
                 </button>
                 <div class="flex-1"></div>
                 <div id="theme-toggle" class="toolbar-chip rounded-lg p-0.5 flex items-center mr-2" role="group" aria-label="Theme">
-                    <button type="button" class="theme-toggle-btn" data-theme-value="macos" aria-pressed="true">macOS</button>
-                    <button type="button" class="theme-toggle-btn" data-theme-value="ios" aria-pressed="false">iOS</button>
+                    <button type="button" class="theme-toggle-btn" data-theme-value="dark" aria-pressed="true">Dark</button>
+                    <button type="button" class="theme-toggle-btn" data-theme-value="light" aria-pressed="false">Light</button>
                 </div>
                 <span id="current-account-name" class="text-sm text-text-muted px-4 py-2 toolbar-chip rounded-lg">全部账户</span>
             </div>
@@ -671,7 +661,7 @@
                                 <div id="account-margin" class="text-2xl font-mono font-medium text-text-secondary">--</div>
                                 <!-- 保证金使用率 -->
                                 <div class="mt-2">
-                                    <div class="h-1.5 bg-ios-elevated rounded-full overflow-hidden">
+                                    <div class="h-1.5 bg-app-elevated rounded-full overflow-hidden">
                                         <div id="margin-ratio-bar" class="h-full bg-accent rounded-full transition-all" style="width: 0%"></div>
                                     </div>
                                     <div id="margin-ratio-text" class="text-xs text-text-muted mt-1 font-mono">0%</div>
@@ -689,9 +679,9 @@
 
                     <!-- 仓位卡片 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
-                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                        <div class="px-6 py-4 border-b app-separator flex items-center justify-between">
                             <h3 class="text-xs text-text-muted uppercase tracking-wide">合约仓位</h3>
-                            <span id="position-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个仓位</span>
+                            <span id="position-count" class="text-xs text-text-muted px-3 py-1 bg-app-elevated rounded-full">0 个仓位</span>
                         </div>
                         <div id="positions-container" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             <!-- 动态生成卡片 -->
@@ -708,9 +698,9 @@
                 <div id="view-assets" class="hidden space-y-5">
                     <!-- 资产卡片 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
-                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                        <div class="px-6 py-4 border-b app-separator flex items-center justify-between">
                             <h3 class="text-xs text-text-muted uppercase tracking-wide">币种资产</h3>
-                            <span id="asset-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个币种</span>
+                            <span id="asset-count" class="text-xs text-text-muted px-3 py-1 bg-app-elevated rounded-full">0 个币种</span>
                         </div>
                         <div id="assets-container" class="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             <!-- 动态生成卡片 -->
@@ -727,19 +717,19 @@
                 <div id="view-pending-orders" class="hidden space-y-5">
                     <!-- 在途订单表格 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
-                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                        <div class="px-6 py-4 border-b app-separator flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <h3 class="text-xs text-text-muted uppercase tracking-wide">在途订单</h3>
-                                <span id="pending-order-count" class="text-xs text-text-muted px-3 py-1 bg-ios-elevated rounded-full">0 个挂单</span>
+                                <span id="pending-order-count" class="text-xs text-text-muted px-3 py-1 bg-app-elevated rounded-full">0 个挂单</span>
                             </div>
-                            <button onclick="loadPendingOrders()" class="px-4 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium transition-all flex items-center gap-2">
+                            <button onclick="loadPendingOrders()" class="px-4 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium transition-all flex items-center gap-2">
                                 <span>刷新</span>
                             </button>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead class="text-xs text-text-muted">
-                                    <tr class="border-b ios-separator">
+                                    <tr class="border-b app-separator">
                                         <th class="text-left px-6 py-3.5 font-medium">时间</th>
                                         <th class="text-left px-6 py-3.5 font-medium">合约</th>
                                         <th class="text-left px-6 py-3.5 font-medium">开平</th>
@@ -775,13 +765,13 @@
                         <div class="flex items-end gap-4">
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">开始时间</label>
-                                <input type="datetime-local" id="order-start" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                                <input type="datetime-local" id="order-start" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">结束时间</label>
-                                <input type="datetime-local" id="order-end" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                                <input type="datetime-local" id="order-end" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
                             </div>
-                            <button onclick="loadOrders()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                            <button onclick="loadOrders()" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-medium text-white">
                                 查询
                             </button>
                         </div>
@@ -789,15 +779,15 @@
 
                     <!-- 订单表格 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
-                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                        <div class="px-6 py-4 border-b app-separator flex items-center justify-between">
                             <h3 class="text-xs text-text-muted uppercase tracking-wide">历史订单</h3>
                             <!-- 分页控件 -->
                             <div id="orders-pagination" class="hidden flex items-center gap-2">
-                                <button onclick="ordersPrevPage()" id="orders-prev-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                <button onclick="ordersPrevPage()" id="orders-prev-btn" class="px-3 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
                                     上一页
                                 </button>
                                 <span id="orders-page-info" class="text-xs text-text-muted px-2">第 1 页</span>
-                                <button onclick="ordersNextPage()" id="orders-next-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                <button onclick="ordersNextPage()" id="orders-next-btn" class="px-3 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
                                     下一页
                                 </button>
                             </div>
@@ -805,7 +795,7 @@
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead class="text-xs text-text-muted">
-                                    <tr class="border-b ios-separator">
+                                    <tr class="border-b app-separator">
                                         <th class="text-left px-6 py-3.5 font-medium">时间</th>
                                         <th class="text-left px-6 py-3.5 font-medium">合约</th>
                                         <th class="text-left px-6 py-3.5 font-medium">方向</th>
@@ -817,7 +807,7 @@
                                         <th class="text-left px-6 py-3.5 font-medium">状态</th>
                                     </tr>
                                 </thead>
-                                <tbody id="orders-table" class="divide-y divide-ios-separator">
+                                <tbody id="orders-table" class="divide-y divide-app-separator">
                                     <!-- 动态生成 -->
                                 </tbody>
                             </table>
@@ -841,7 +831,7 @@
                         <div class="flex items-end gap-4 flex-wrap">
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">账单类型</label>
-                                <select id="bill-type" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
+                                <select id="bill-type" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
                                     <option value="">全部</option>
                                     <option value="2">交易</option>
                                     <option value="8">资金费</option>
@@ -852,13 +842,13 @@
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">开始时间</label>
-                                <input type="datetime-local" id="bill-start" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                                <input type="datetime-local" id="bill-start" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">结束时间</label>
-                                <input type="datetime-local" id="bill-end" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                                <input type="datetime-local" id="bill-end" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
                             </div>
-                            <button onclick="loadBills()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                            <button onclick="loadBills()" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-medium text-white">
                                 查询
                             </button>
                         </div>
@@ -866,18 +856,18 @@
 
                     <!-- 账单表格 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
-                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                        <div class="px-6 py-4 border-b app-separator flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <h3 class="text-xs text-text-muted uppercase tracking-wide">账单流水</h3>
                                 <span id="bill-summary" class="text-xs text-text-muted"></span>
                             </div>
                             <!-- 分页控件 -->
                             <div id="bills-pagination" class="hidden flex items-center gap-2">
-                                <button onclick="billsPrevPage()" id="bills-prev-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                <button onclick="billsPrevPage()" id="bills-prev-btn" class="px-3 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
                                     上一页
                                 </button>
                                 <span id="bills-page-info" class="text-xs text-text-muted px-2">第 1 页</span>
-                                <button onclick="billsNextPage()" id="bills-next-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                <button onclick="billsNextPage()" id="bills-next-btn" class="px-3 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
                                     下一页
                                 </button>
                             </div>
@@ -885,7 +875,7 @@
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead class="text-xs text-text-muted">
-                                    <tr class="border-b ios-separator">
+                                    <tr class="border-b app-separator">
                                         <th class="text-left px-6 py-3.5 font-medium">时间</th>
                                         <th class="text-left px-6 py-3.5 font-medium">类型</th>
                                         <th class="text-left px-6 py-3.5 font-medium">子类型</th>
@@ -897,7 +887,7 @@
                                         <th class="text-right px-6 py-3.5 font-medium">账户余额</th>
                                     </tr>
                                 </thead>
-                                <tbody id="bills-table" class="divide-y divide-ios-separator">
+                                <tbody id="bills-table" class="divide-y divide-app-separator">
                                     <!-- 动态生成 -->
                                 </tbody>
                             </table>
@@ -921,25 +911,25 @@
                         <div class="flex items-end gap-4 flex-wrap">
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">开始时间</label>
-                                <input type="datetime-local" id="pos-history-start" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                                <input type="datetime-local" id="pos-history-start" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">结束时间</label>
-                                <input type="datetime-local" id="pos-history-end" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
+                                <input type="datetime-local" id="pos-history-end" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">合约</label>
-                                <input type="text" id="pos-history-inst" placeholder="如 BTC-USDT-SWAP" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all w-48">
+                                <input type="text" id="pos-history-inst" placeholder="如 BTC-USDT-SWAP" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all w-48">
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">方向</label>
-                                <select id="pos-history-side" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[100px]">
+                                <select id="pos-history-side" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[100px]">
                                     <option value="">全部</option>
                                     <option value="long">多</option>
                                     <option value="short">空</option>
                                 </select>
                             </div>
-                            <button onclick="loadPositionHistory()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                            <button onclick="loadPositionHistory()" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-medium text-white">
                                 查询
                             </button>
                         </div>
@@ -947,15 +937,15 @@
 
                     <!-- 仓位卡片容器 -->
                     <div class="glass-light rounded-2xl overflow-hidden fade-in">
-                        <div class="px-6 py-4 border-b ios-separator flex items-center justify-between">
+                        <div class="px-6 py-4 border-b app-separator flex items-center justify-between">
                             <h3 class="text-xs text-text-muted uppercase tracking-wide">历史仓位</h3>
                             <!-- 分页控件 -->
                             <div id="pos-history-pagination" class="hidden flex items-center gap-2">
-                                <button onclick="posHistoryPrevPage()" id="pos-history-prev-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                <button onclick="posHistoryPrevPage()" id="pos-history-prev-btn" class="px-3 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
                                     上一页
                                 </button>
                                 <span id="pos-history-page-info" class="text-xs text-text-muted px-2">第 1 页</span>
-                                <button onclick="posHistoryNextPage()" id="pos-history-next-btn" class="px-3 py-1.5 bg-ios-elevated hover:bg-ios-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
+                                <button onclick="posHistoryNextPage()" id="pos-history-next-btn" class="px-3 py-1.5 bg-app-elevated hover:bg-app-surface rounded-lg text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all" disabled>
                                     下一页
                                 </button>
                             </div>
@@ -982,7 +972,7 @@
                         <div class="flex items-end gap-4 flex-wrap">
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">时间范围</label>
-                                <select id="equity-days" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
+                                <select id="equity-days" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
                                     <option value="7">最近 7 天</option>
                                     <option value="14">最近 14 天</option>
                                     <option value="30" selected>最近 30 天</option>
@@ -992,13 +982,13 @@
                             </div>
                             <div>
                                 <label class="text-xs text-text-muted block mb-2">数据粒度</label>
-                                <select id="equity-interval" class="bg-ios-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
+                                <select id="equity-interval" class="bg-app-elevated border-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-w-[120px]">
                                     <option value="raw">原始数据</option>
                                     <option value="hourly">按小时</option>
                                     <option value="daily">按天</option>
                                 </select>
                             </div>
-                            <button onclick="loadEquityCurve()" class="px-6 py-2.5 btn-ios rounded-xl text-sm font-medium text-white">
+                            <button onclick="loadEquityCurve()" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-medium text-white">
                                 查询
                             </button>
                         </div>
@@ -1081,6 +1071,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=2"></script>
 </body>
 </html>
