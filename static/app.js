@@ -397,7 +397,7 @@ function selectAccount(accountId) {
     // 检查当前 tab，如果在订单或账单页，需要重新加载数据
     const currentTab = getCurrentTab();
     if (currentTab === 'pending-orders') {
-        renderPendingOrdersTable();
+        loadPendingOrders();
     } else if (currentTab === 'orders') {
         loadOrders();
     } else if (currentTab === 'bills') {
@@ -406,14 +406,10 @@ function selectAccount(accountId) {
         renderAssetsTable();
     } else if (currentTab === 'position-history') {
         // 历史仓位需要单账户
-        if (accountId !== null) {
-            loadPositionHistory();
-        }
+        loadPositionHistory();
     } else if (currentTab === 'equity-curve') {
         // 资产曲线需要单账户，切换时重新加载
-        if (accountId !== null) {
-            loadEquityCurve();
-        }
+        loadEquityCurve();
     }
 }
 
