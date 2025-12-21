@@ -2,6 +2,8 @@
  * OKX 多账户 Dashboard 前端逻辑
  */
 
+const ACCOUNT_KEY_ALL = '__ALL__';
+
 // 状态管理
 const state = {
     accounts: [],
@@ -10,6 +12,17 @@ const state = {
     positions: {},          // accountId -> positions[]
     pendingOrders: {},      // accountId -> pendingOrders[]
     wsConnected: false,
+    activeTab: 'positions',
+    autoRefreshMs: 30 * 1000,
+    cache: {
+        orders: {},      // accountKey -> { items, hasMore, lastId, fetchedAt, showAccountName }
+        bills: {},       // accountKey -> { items, hasMore, lastId, fetchedAt, showAccountName }
+        posHistory: {},  // accountKey -> { items, hasMore, lastId, fetchedAt }
+        equityCurve: {}, // accountKey -> { data, fetchedAt }  (data is /equity-curve response)
+    },
+    dataAt: {
+        pendingOrders: {}, // accountKey -> last update ms (WS or REST)
+    },
     // 订单分页状态
     ordersPagination: {
         page: 1,
@@ -167,6 +180,19 @@ let ws = null;
 let wsPingTimer = null;
 let wsReconnectTimer = null;
 
+function nowMs() {
+    return Date.now();
+}
+
+function getAccountKey() {
+    return state.currentAccountId === null ? ACCOUNT_KEY_ALL : state.currentAccountId;
+}
+
+function isStale(tsMs) {
+    if (!tsMs) return true;
+    return nowMs() - tsMs > state.autoRefreshMs;
+}
+
 /**
  * 初始化应用
  */
@@ -299,6 +325,10 @@ function handleWsMessage(msg) {
             if (state.currentAccountId === null || state.currentAccountId === msg.account_id) {
                 renderBalanceCard();
             }
+            // 如果当前在资产页，资产需要跟随 balance 的 assets 刷新
+            if (state.activeTab === 'assets' && (state.currentAccountId === null || state.currentAccountId === msg.account_id)) {
+                renderAssetsTable();
+            }
             break;
 
         case 'positions':
@@ -310,11 +340,12 @@ function handleWsMessage(msg) {
 
         case 'pending_orders':
             state.pendingOrders[msg.account_id] = msg.data;
-            if (state.currentAccountId === null || state.currentAccountId === msg.account_id) {
-                // 如果当前在在途订单页，则刷新表格
-                if (getCurrentTab() === 'pending-orders') {
-                    renderPendingOrdersTable();
-                }
+            // 记录更新时间：单账户 + 全部账户都更新一下，供 TTL 判断
+            state.dataAt.pendingOrders[msg.account_id] = nowMs();
+            state.dataAt.pendingOrders[ACCOUNT_KEY_ALL] = nowMs();
+
+            if (state.activeTab === 'pending-orders' && (state.currentAccountId === null || state.currentAccountId === msg.account_id)) {
+                renderPendingOrdersTable();
             }
             break;
 
@@ -342,7 +373,7 @@ function updateWsStatus(connected) {
  */
 function renderAccountList() {
     let html = `
-        <button onclick="selectAccount(null)" class="account-btn group relative w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${state.currentAccountId === null ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
+        <button type="button" data-account-id="${ACCOUNT_KEY_ALL}" onclick="selectAccount(null)" class="account-btn group relative w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${state.currentAccountId === null ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
             ${state.currentAccountId === null ? '<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>' : ''}
             <div class="flex items-center justify-between">
                 <span class="flex items-center gap-2">
@@ -362,7 +393,7 @@ function renderAccountList() {
         const pnlClass = pnl >= 0 ? 'text-profit' : 'text-loss';
 
         html += `
-            <button onclick="selectAccount('${account.id}')" class="account-btn group relative w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${isActive ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
+            <button type="button" data-account-id="${account.id}" onclick="selectAccount('${account.id}')" class="account-btn group relative w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${isActive ? 'bg-accent text-white' : 'hover:bg-glass-hover text-text-primary'}">
                 ${isActive ? '<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"></div>' : ''}
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -372,14 +403,45 @@ function renderAccountList() {
                     ${account.simulated ? '<span class="text-xs px-1.5 py-0.5 rounded bg-warning/20 text-warning">模拟</span>' : ''}
                 </div>
                 <div class="flex items-center justify-between mt-1.5 ml-6">
-                    <span class="text-xs ${isActive ? 'text-white/70' : 'text-text-muted'} font-mono">$${equity}</span>
-                    ${balance && pnl !== 0 ? `<span class="text-xs font-mono ${isActive ? 'text-white/70' : pnlClass}">${pnl >= 0 ? '+' : ''}${formatNumber(pnl)}</span>` : ''}
+                    <span data-role="account-equity" class="text-xs ${isActive ? 'text-white/70' : 'text-text-muted'} font-mono">$${equity}</span>
+                    <span data-role="account-pnl" class="text-xs font-mono ${balance && pnl !== 0 ? (isActive ? 'text-white/70' : pnlClass) : 'hidden'}">
+                        ${balance && pnl !== 0 ? `${pnl >= 0 ? '+' : ''}${formatNumber(pnl)}` : ''}
+                    </span>
                 </div>
             </button>
         `;
     }
 
     elements.accountList.innerHTML = html;
+}
+
+function updateAccountListMetrics() {
+    if (!elements.accountList) return;
+
+    // 只更新数值文本与少量 class，避免频繁重建 DOM 导致“点击失效”
+    const buttons = elements.accountList.querySelectorAll('button[data-account-id]');
+    for (const btn of buttons) {
+        const accountId = btn.dataset.accountId;
+        if (!accountId || accountId === ACCOUNT_KEY_ALL) continue;
+
+        const isActive = state.currentAccountId === accountId;
+        const balance = state.balances[accountId];
+
+        const equitySpan = btn.querySelector('[data-role="account-equity"]');
+        if (equitySpan) {
+            const equityText = balance ? formatNumber(balance.total_equity) : '--';
+            equitySpan.textContent = '$' + equityText;
+            equitySpan.className = `text-xs ${isActive ? 'text-white/70' : 'text-text-muted'} font-mono`;
+        }
+
+        const pnlSpan = btn.querySelector('[data-role="account-pnl"]');
+        if (pnlSpan) {
+            const pnl = balance ? (balance.unrealized_pnl || 0) : 0;
+            const show = !!balance && pnl !== 0;
+            pnlSpan.textContent = show ? ((pnl >= 0 ? '+' : '') + formatNumber(pnl)) : '';
+            pnlSpan.className = `text-xs font-mono ${show ? (isActive ? 'text-white/70' : (pnl >= 0 ? 'text-profit' : 'text-loss')) : 'hidden'}`;
+        }
+    }
 }
 
 /**
@@ -397,29 +459,15 @@ function selectAccount(accountId) {
         elements.currentAccountName.textContent = account ? account.name : '';
     }
 
-    // 检查当前 tab，如果在订单或账单页，需要重新加载数据
-    const currentTab = getCurrentTab();
-    if (currentTab === 'pending-orders') {
-        loadPendingOrders();
-    } else if (currentTab === 'orders') {
-        loadOrders();
-    } else if (currentTab === 'bills') {
-        loadBills();
-    } else if (currentTab === 'assets') {
-        renderAssetsTable();
-    } else if (currentTab === 'position-history') {
-        // 历史仓位需要单账户
-        loadPositionHistory();
-    } else if (currentTab === 'equity-curve') {
-        // 资产曲线需要单账户，切换时重新加载
-        loadEquityCurve();
-    }
+    // 账号切换后：让当前 tab 自己决定是否需要重新请求（基于 TTL=30s / 缓存）
+    onTabActivated(state.activeTab, { reason: 'account-change' });
 }
 
 /**
  * 获取当前激活的 tab
  */
 function getCurrentTab() {
+    if (state.activeTab) return state.activeTab;
     if (!document.getElementById('view-positions').classList.contains('hidden')) {
         return 'positions';
     } else if (!document.getElementById('view-assets').classList.contains('hidden')) {
@@ -457,8 +505,8 @@ function updateTotalSummary() {
     elements.totalPnl.textContent = '$' + pnlText;
     elements.totalPnl.className = `text-sm font-mono font-medium ${totalPnl >= 0 ? 'text-profit' : 'text-loss'}`;
 
-    // 同时更新账户列表中的权益显示
-    renderAccountList();
+    // 同时更新账户列表中的权益显示（避免频繁重建 DOM）
+    updateAccountListMetrics();
 }
 
 /**
@@ -784,6 +832,7 @@ function getCryptoIconUrl(symbol) {
  * 切换标签页
  */
 function switchTab(tab) {
+    state.activeTab = tab;
     const viewPositions = document.getElementById('view-positions');
     const viewAssets = document.getElementById('view-assets');
     const viewPendingOrders = document.getElementById('view-pending-orders');
@@ -824,62 +873,234 @@ function switchTab(tab) {
     } else if (tab === 'assets') {
         viewAssets.classList.remove('hidden');
         tabAssets.className = activeClass;
-        renderAssetsTable();
     } else if (tab === 'pending-orders') {
         viewPendingOrders.classList.remove('hidden');
         tabPendingOrders.className = activeClass;
-        // 首次切换时加载在途订单
-        if (elements.pendingOrdersTable.children.length === 0) {
-            loadPendingOrders();
-        }
     } else if (tab === 'orders') {
         viewOrders.classList.remove('hidden');
         tabOrders.className = activeClass;
-        // 首次切换到订单页时加载订单
-        if (elements.ordersTable.children.length === 0) {
-            loadOrders();
-        }
     } else if (tab === 'bills') {
         viewBills.classList.remove('hidden');
         tabBills.className = activeClass;
-        // 首次切换到账单页时加载账单
-        if (elements.billsTable.children.length === 0) {
-            loadBills();
-        }
     } else if (tab === 'position-history') {
         viewPositionHistory.classList.remove('hidden');
         tabPositionHistory.className = activeClass;
-        // 首次切换时加载历史仓位
-        if (elements.posHistoryContainer.children.length === 0) {
-            loadPositionHistory();
-        }
     } else if (tab === 'equity-curve') {
         viewEquityCurve.classList.remove('hidden');
         tabEquityCurve.className = activeClass;
-        // 首次切换时加载资产曲线
-        if (!state.equityChart) {
-            loadEquityCurve();
+    }
+
+    onTabActivated(tab, { reason: 'tab-switch' });
+}
+
+function resetOrdersToFirstPage() {
+    state.ordersPagination = { page: 1, cursors: [null], hasMore: false };
+    elements.ordersPagination.classList.add('hidden');
+}
+
+function resetBillsToFirstPage() {
+    state.billsPagination = { page: 1, cursors: [null], hasMore: false };
+    elements.billsPagination.classList.add('hidden');
+}
+
+function resetPosHistoryToFirstPage() {
+    state.posHistoryPagination = { page: 1, cursors: [null], hasMore: false };
+    elements.posHistoryPagination.classList.add('hidden');
+}
+
+function applyOrdersCache(cache) {
+    if (!cache) return false;
+    resetOrdersToFirstPage();
+
+    renderOrdersTable(cache.items || [], cache.showAccountName);
+    if (state.currentAccountId === null) {
+        elements.ordersPagination.classList.add('hidden');
+        return true;
+    }
+    state.ordersPagination.hasMore = !!cache.hasMore;
+    if (cache.hasMore && cache.lastId) {
+        state.ordersPagination.cursors[1] = cache.lastId;
+    }
+    updateOrdersPagination();
+    return true;
+}
+
+function applyBillsCache(cache) {
+    if (!cache) return false;
+    resetBillsToFirstPage();
+
+    renderBillsTable(cache.items || [], cache.showAccountName);
+    if (state.currentAccountId === null) {
+        elements.billsPagination.classList.add('hidden');
+        return true;
+    }
+    state.billsPagination.hasMore = !!cache.hasMore;
+    if (cache.hasMore && cache.lastId) {
+        state.billsPagination.cursors[1] = cache.lastId;
+    }
+    updateBillsPagination();
+    return true;
+}
+
+function applyPosHistoryCache(cache) {
+    if (!cache) return false;
+    resetPosHistoryToFirstPage();
+
+    renderPositionHistoryCards(cache.items || []);
+    state.posHistoryPagination.hasMore = !!cache.hasMore;
+    if (cache.hasMore && cache.lastId) {
+        state.posHistoryPagination.cursors[1] = cache.lastId;
+    }
+    updatePosHistoryPagination();
+    return true;
+}
+
+function applyEquityCurveCache(cache) {
+    if (!cache || !cache.data) return false;
+    const data = cache.data;
+    const points = Array.isArray(data.points) ? data.points : [];
+
+    // 兼容后端返回：points 为空也算有效缓存（无需重复请求）
+    if (!points.length) {
+        const noDataEl = document.getElementById('no-equity-data');
+        noDataEl.classList.remove('hidden');
+        if (state.equityChart) {
+            state.equityChart.destroy();
+            state.equityChart = null;
         }
+        state.equityCurvePoints = null;
+        document.getElementById('equity-start').textContent = '--';
+        document.getElementById('equity-end').textContent = '--';
+        document.getElementById('equity-change').textContent = '--';
+        document.getElementById('equity-points').textContent = '--';
+        return true;
+    }
+
+    // 更新汇总信息
+    const startBal = data.start_balance || 0;
+    const endBal = data.end_balance || 0;
+    const change = endBal - startBal;
+    const changePercent = startBal > 0 ? ((change / startBal) * 100).toFixed(2) : 0;
+
+    document.getElementById('equity-start').textContent = '$' + formatNumber(startBal);
+    document.getElementById('equity-end').textContent = '$' + formatNumber(endBal);
+
+    const changeText = (change >= 0 ? '+' : '') + formatNumber(change) + ` (${change >= 0 ? '+' : ''}${changePercent}%)`;
+    const changeEl = document.getElementById('equity-change');
+    changeEl.textContent = changeText;
+    changeEl.className = `text-xl font-mono font-semibold ${change >= 0 ? 'text-profit' : 'text-loss'}`;
+    document.getElementById('equity-points').textContent = data.total_points || points.length;
+
+    // 渲染图表
+    state.equityCurvePoints = points;
+    renderEquityChart(points);
+    document.getElementById('no-equity-data').classList.add('hidden');
+    return true;
+}
+
+function shouldAutoFetchPendingOrders() {
+    const key = getAccountKey();
+    const lastAt = state.dataAt.pendingOrders[key] || 0;
+    const hasSnapshot =
+        key === ACCOUNT_KEY_ALL
+            ? state.accounts.some((a) => state.pendingOrders[a.id] !== undefined)
+            : state.pendingOrders[key] !== undefined;
+    return !hasSnapshot || isStale(lastAt);
+}
+
+function onTabActivated(tab, { reason } = {}) {
+    // 统一：回到第 1 页（且尽量先用缓存/现有 state 立即渲染）
+    if (tab === 'positions') {
+        renderCurrentView();
+        return;
+    }
+    if (tab === 'assets') {
+        renderAssetsTable();
+        return;
+    }
+    if (tab === 'pending-orders') {
+        // 始终先渲染一次（解决：离开 tab 期间 WS 更新导致的 UI 不刷新）
+        renderPendingOrdersTable();
+        if (shouldAutoFetchPendingOrders()) {
+            loadPendingOrders({ preserveExisting: true, reason: reason || 'auto' });
+        }
+        return;
+    }
+    if (tab === 'orders') {
+        resetOrdersToFirstPage();
+        const key = getAccountKey();
+        const cache = state.cache.orders[key];
+        if (cache) applyOrdersCache(cache);
+        if (!cache || isStale(cache.fetchedAt)) {
+            loadOrders(true, { preserveExisting: !!cache, reason: reason || 'auto' });
+        }
+        return;
+    }
+    if (tab === 'bills') {
+        resetBillsToFirstPage();
+        const key = getAccountKey();
+        const cache = state.cache.bills[key];
+        if (cache) applyBillsCache(cache);
+        if (!cache || isStale(cache.fetchedAt)) {
+            loadBills(true, { preserveExisting: !!cache, reason: reason || 'auto' });
+        }
+        return;
+    }
+    if (tab === 'position-history') {
+        resetPosHistoryToFirstPage();
+        // 该 tab 仅支持单账户
+        if (state.currentAccountId === null) {
+            loadPositionHistory(true, { preserveExisting: false, reason: reason || 'auto' });
+            return;
+        }
+        const key = getAccountKey();
+        const cache = state.cache.posHistory[key];
+        if (cache) applyPosHistoryCache(cache);
+        if (!cache || isStale(cache.fetchedAt)) {
+            loadPositionHistory(true, { preserveExisting: !!cache, reason: reason || 'auto' });
+        }
+        return;
+    }
+    if (tab === 'equity-curve') {
+        // 该 tab 仅支持单账户
+        if (state.currentAccountId === null) {
+            loadEquityCurve({ preserveExisting: false, reason: reason || 'auto' });
+            return;
+        }
+        const key = getAccountKey();
+        const cache = state.cache.equityCurve[key];
+        if (cache) applyEquityCurveCache(cache);
+        if (!cache || isStale(cache.fetchedAt)) {
+            loadEquityCurve({ preserveExisting: !!cache, reason: reason || 'auto' });
+        }
+        return;
     }
 }
 
 /**
  * 加载在途订单
  */
-async function loadPendingOrders() {
+async function loadPendingOrders(options = {}) {
+    const { preserveExisting = false } = options || {};
+
     elements.pendingOrdersLoading.classList.remove('hidden');
     elements.noPendingOrders.classList.add('hidden');
-    elements.pendingOrdersTable.innerHTML = '';
+    if (!preserveExisting) {
+        elements.pendingOrdersTable.innerHTML = '';
+    }
 
     try {
         if (state.currentAccountId === null) {
             // 全部账户模式：加载所有账户的在途订单
             await loadAllAccountsPendingOrders();
+            state.dataAt.pendingOrders[ACCOUNT_KEY_ALL] = nowMs();
         } else {
             // 单账户模式
             const resp = await fetch(`/api/accounts/${state.currentAccountId}/pending-orders`);
             const orders = await resp.json();
             state.pendingOrders[state.currentAccountId] = orders;
+            state.dataAt.pendingOrders[state.currentAccountId] = nowMs();
+            state.dataAt.pendingOrders[ACCOUNT_KEY_ALL] = nowMs();
             renderPendingOrdersTable();
         }
     } catch (err) {
@@ -899,6 +1120,7 @@ async function loadAllAccountsPendingOrders() {
             const resp = await fetch(`/api/accounts/${account.id}/pending-orders`);
             const orders = await resp.json();
             state.pendingOrders[account.id] = orders;
+            state.dataAt.pendingOrders[account.id] = nowMs();
         } catch (err) {
             console.error(`Failed to load pending orders for ${account.name}:`, err);
         }
@@ -1079,10 +1301,10 @@ function renderPendingOrdersTable() {
 /**
  * 加载历史订单（支持分页）
  */
-async function loadOrders(resetPage = true) {
+async function loadOrders(resetPage = true, options = {}) {
     if (state.currentAccountId === null) {
         // 全部账户模式暂不支持分页
-        await loadAllAccountsOrders();
+        await loadAllAccountsOrders(options);
         return;
     }
 
@@ -1106,9 +1328,12 @@ async function loadOrders(resetPage = true) {
         url += `&after=${currentCursor}`;
     }
 
+    const { preserveExisting = false } = options || {};
     elements.ordersLoading.classList.remove('hidden');
     elements.noOrders.classList.add('hidden');
-    elements.ordersTable.innerHTML = '';
+    if (!preserveExisting) {
+        elements.ordersTable.innerHTML = '';
+    }
     elements.ordersPagination.classList.add('hidden');
 
     try {
@@ -1122,6 +1347,18 @@ async function loadOrders(resetPage = true) {
         }
         
         renderOrdersTable(data.items);
+
+        // 仅缓存第 1 页（用于 tab 切回时立即恢复到第 1 页）
+        if (state.ordersPagination.page === 1) {
+            const key = getAccountKey();
+            state.cache.orders[key] = {
+                items: data.items,
+                hasMore: data.has_more,
+                lastId: data.last_id,
+                fetchedAt: nowMs(),
+                showAccountName: false,
+            };
+        }
         updateOrdersPagination();
     } catch (err) {
         console.error('Failed to load orders:', err);
@@ -1136,8 +1373,9 @@ async function loadOrders(resetPage = true) {
  */
 function updateOrdersPagination() {
     const { page, hasMore } = state.ordersPagination;
-    
-    elements.ordersPagination.classList.remove('hidden');
+    const shouldShow = page > 1 || hasMore;
+    elements.ordersPagination.classList.toggle('hidden', !shouldShow);
+    if (!shouldShow) return;
     elements.ordersPageInfo.textContent = `第 ${page} 页`;
     elements.ordersPrevBtn.disabled = page <= 1;
     elements.ordersNextBtn.disabled = !hasMore;
@@ -1166,13 +1404,16 @@ function ordersNextPage() {
 /**
  * 加载所有账户的订单（不支持分页，只加载第一页）
  */
-async function loadAllAccountsOrders() {
+async function loadAllAccountsOrders(options = {}) {
+    const { preserveExisting = false } = options || {};
     const startInput = document.getElementById('order-start').value;
     const endInput = document.getElementById('order-end').value;
 
     elements.ordersLoading.classList.remove('hidden');
     elements.noOrders.classList.add('hidden');
-    elements.ordersTable.innerHTML = '';
+    if (!preserveExisting) {
+        elements.ordersTable.innerHTML = '';
+    }
     elements.ordersPagination.classList.add('hidden');
 
     const allOrders = [];
@@ -1198,6 +1439,15 @@ async function loadAllAccountsOrders() {
         // 按时间排序
         allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         renderOrdersTable(allOrders, true);
+
+        // 缓存（全部账户：无分页）
+        state.cache.orders[ACCOUNT_KEY_ALL] = {
+            items: allOrders,
+            hasMore: false,
+            lastId: null,
+            fetchedAt: nowMs(),
+            showAccountName: true,
+        };
     } catch (err) {
         console.error('Failed to load orders:', err);
         elements.ordersTable.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-loss">加载失败: ${err.message}</td></tr>`;
@@ -1209,10 +1459,10 @@ async function loadAllAccountsOrders() {
 /**
  * 加载账单流水（支持分页）
  */
-async function loadBills(resetPage = true) {
+async function loadBills(resetPage = true, options = {}) {
     if (state.currentAccountId === null) {
         // 全部账户模式暂不支持分页
-        await loadAllAccountsBills();
+        await loadAllAccountsBills(options);
         return;
     }
 
@@ -1240,9 +1490,12 @@ async function loadBills(resetPage = true) {
         url += `&after=${currentCursor}`;
     }
 
+    const { preserveExisting = false } = options || {};
     elements.billsLoading.classList.remove('hidden');
     elements.noBills.classList.add('hidden');
-    elements.billsTable.innerHTML = '';
+    if (!preserveExisting) {
+        elements.billsTable.innerHTML = '';
+    }
     elements.billsPagination.classList.add('hidden');
 
     try {
@@ -1256,6 +1509,18 @@ async function loadBills(resetPage = true) {
         }
         
         renderBillsTable(data.items);
+
+        // 仅缓存第 1 页
+        if (state.billsPagination.page === 1) {
+            const key = getAccountKey();
+            state.cache.bills[key] = {
+                items: data.items,
+                hasMore: data.has_more,
+                lastId: data.last_id,
+                fetchedAt: nowMs(),
+                showAccountName: false,
+            };
+        }
         updateBillsPagination();
     } catch (err) {
         console.error('Failed to load bills:', err);
@@ -1270,8 +1535,9 @@ async function loadBills(resetPage = true) {
  */
 function updateBillsPagination() {
     const { page, hasMore } = state.billsPagination;
-    
-    elements.billsPagination.classList.remove('hidden');
+    const shouldShow = page > 1 || hasMore;
+    elements.billsPagination.classList.toggle('hidden', !shouldShow);
+    if (!shouldShow) return;
     elements.billsPageInfo.textContent = `第 ${page} 页`;
     elements.billsPrevBtn.disabled = page <= 1;
     elements.billsNextBtn.disabled = !hasMore;
@@ -1300,14 +1566,17 @@ function billsNextPage() {
 /**
  * 加载所有账户的账单（不支持分页，只加载第一页）
  */
-async function loadAllAccountsBills() {
+async function loadAllAccountsBills(options = {}) {
+    const { preserveExisting = false } = options || {};
     const billType = document.getElementById('bill-type').value;
     const startInput = document.getElementById('bill-start').value;
     const endInput = document.getElementById('bill-end').value;
 
     elements.billsLoading.classList.remove('hidden');
     elements.noBills.classList.add('hidden');
-    elements.billsTable.innerHTML = '';
+    if (!preserveExisting) {
+        elements.billsTable.innerHTML = '';
+    }
     elements.billsPagination.classList.add('hidden');
 
     const allBills = [];
@@ -1336,6 +1605,15 @@ async function loadAllAccountsBills() {
         // 按时间排序
         allBills.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         renderBillsTable(allBills, true);
+
+        // 缓存（全部账户：无分页）
+        state.cache.bills[ACCOUNT_KEY_ALL] = {
+            items: allBills,
+            hasMore: false,
+            lastId: null,
+            fetchedAt: nowMs(),
+            showAccountName: true,
+        };
     } catch (err) {
         console.error('Failed to load bills:', err);
         elements.billsTable.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-loss">加载失败: ${err.message}</td></tr>`;
@@ -1349,6 +1627,7 @@ async function loadAllAccountsBills() {
  */
 function renderBillsTable(bills, showAccountName = false) {
     if (bills.length === 0) {
+        elements.billsTable.innerHTML = '';
         elements.noBills.classList.remove('hidden');
         elements.billSummary.textContent = '';
         return;
@@ -1563,7 +1842,7 @@ function renderBillsTable(bills, showAccountName = false) {
 /**
  * 加载历史仓位（支持分页）
  */
-async function loadPositionHistory(resetPage = true) {
+async function loadPositionHistory(resetPage = true, options = {}) {
     // 必须选择单个账户
     if (state.currentAccountId === null) {
         // 默认选择第一个账户
@@ -1604,9 +1883,12 @@ async function loadPositionHistory(resetPage = true) {
         url += `&after=${currentCursor}`;
     }
 
+    const { preserveExisting = false } = options || {};
     elements.posHistoryLoading.classList.remove('hidden');
     elements.noPosHistory.classList.add('hidden');
-    elements.posHistoryContainer.innerHTML = '';
+    if (!preserveExisting) {
+        elements.posHistoryContainer.innerHTML = '';
+    }
     elements.posHistoryPagination.classList.add('hidden');
 
     try {
@@ -1620,6 +1902,17 @@ async function loadPositionHistory(resetPage = true) {
         }
 
         renderPositionHistoryCards(data.items);
+
+        // 仅缓存第 1 页
+        if (state.posHistoryPagination.page === 1) {
+            const key = getAccountKey();
+            state.cache.posHistory[key] = {
+                items: data.items,
+                hasMore: data.has_more,
+                lastId: data.last_id,
+                fetchedAt: nowMs(),
+            };
+        }
         updatePosHistoryPagination();
     } catch (err) {
         console.error('Failed to load position history:', err);
@@ -1635,7 +1928,9 @@ async function loadPositionHistory(resetPage = true) {
 function updatePosHistoryPagination() {
     const { page, hasMore } = state.posHistoryPagination;
 
-    elements.posHistoryPagination.classList.remove('hidden');
+    const shouldShow = page > 1 || hasMore;
+    elements.posHistoryPagination.classList.toggle('hidden', !shouldShow);
+    if (!shouldShow) return;
     elements.posHistoryPageInfo.textContent = `第 ${page} 页`;
     elements.posHistoryPrevBtn.disabled = page <= 1;
     elements.posHistoryNextBtn.disabled = !hasMore;
@@ -1666,6 +1961,7 @@ function posHistoryNextPage() {
  */
 function renderPositionHistoryCards(positions) {
     if (positions.length === 0) {
+        elements.posHistoryContainer.innerHTML = '';
         elements.noPosHistory.classList.remove('hidden');
         return;
     }
@@ -1820,7 +2116,8 @@ function calculateDuration(start, end) {
 /**
  * 加载资产曲线数据
  */
-async function loadEquityCurve() {
+async function loadEquityCurve(options = {}) {
+    const { preserveExisting = false } = options || {};
     // 必须选择单个账户
     if (state.currentAccountId === null) {
         // 默认选择第一个账户
@@ -1840,7 +2137,9 @@ async function loadEquityCurve() {
     const noDataEl = document.getElementById('no-equity-data');
     
     loadingEl.classList.remove('hidden');
-    noDataEl.classList.add('hidden');
+    if (!preserveExisting) {
+        noDataEl.classList.add('hidden');
+    }
 
     try {
         const url = `/api/accounts/${state.currentAccountId}/equity-curve?days=${days}&interval=${interval}`;
@@ -1860,6 +2159,9 @@ async function loadEquityCurve() {
             document.getElementById('equity-end').textContent = '--';
             document.getElementById('equity-change').textContent = '--';
             document.getElementById('equity-points').textContent = '--';
+
+            // 缓存空结果，避免频繁重复请求
+            state.cache.equityCurve[getAccountKey()] = { data, fetchedAt: nowMs() };
             return;
         }
 
@@ -1882,6 +2184,9 @@ async function loadEquityCurve() {
         // 渲染图表
         state.equityCurvePoints = data.points;
         renderEquityChart(data.points);
+
+        // 缓存（按账户）
+        state.cache.equityCurve[getAccountKey()] = { data, fetchedAt: nowMs() };
 
     } catch (err) {
         console.error('Failed to load equity curve:', err);
@@ -2005,6 +2310,7 @@ function renderEquityChart(points) {
  */
 function renderOrdersTable(orders, showAccountName = false) {
     if (orders.length === 0) {
+        elements.ordersTable.innerHTML = '';
         elements.noOrders.classList.remove('hidden');
         return;
     }
