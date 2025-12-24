@@ -3,7 +3,19 @@ name = "portfolio-monitor"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14.2"
 dependencies = [
-    "pre-commit>=4.5.0",
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+    "python-socks[asyncio]",
+    "httpx[socks]",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
 ]

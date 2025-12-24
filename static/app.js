@@ -595,6 +595,12 @@ function renderPositionsTable() {
                 positions.push({ ...pos, accountName });
             }
         }
+        // 按开仓时间排序（新的在前）
+        positions.sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at) : 0;
+            const timeB = b.created_at ? new Date(b.created_at) : 0;
+            return timeB - timeA;
+        });
     } else {
         // 单账户模式下也添加账户名称
         const account = state.accounts.find(a => a.id === state.currentAccountId);
@@ -946,7 +952,7 @@ function applyPosHistoryCache(cache) {
     if (!cache) return false;
     resetPosHistoryToFirstPage();
 
-    renderPositionHistoryCards(cache.items || []);
+    renderPositionHistoryCards(cache.items || [], cache.showAccountName);
     state.posHistoryPagination.hasMore = !!cache.hasMore;
     if (cache.hasMore && cache.lastId) {
         state.posHistoryPagination.cursors[1] = cache.lastId;
@@ -1048,11 +1054,6 @@ function onTabActivated(tab, { reason } = {}) {
     }
     if (tab === 'position-history') {
         resetPosHistoryToFirstPage();
-        // 该 tab 仅支持单账户
-        if (state.currentAccountId === null) {
-            loadPositionHistory(true, { preserveExisting: false, reason: reason || 'auto' });
-            return;
-        }
         const key = getAccountKey();
         const cache = state.cache.posHistory[key];
         if (cache) applyPosHistoryCache(cache);
@@ -1112,17 +1113,24 @@ async function loadPendingOrders(options = {}) {
 }
 
 /**
- * 加载所有账户的在途订单
+ * 加载所有账户的在途订单（并发请求）
  */
 async function loadAllAccountsPendingOrders() {
-    for (const account of state.accounts) {
-        try {
+    const results = await Promise.allSettled(
+        state.accounts.map(async (account) => {
             const resp = await fetch(`/api/accounts/${account.id}/pending-orders`);
             const orders = await resp.json();
+            return { account, orders };
+        })
+    );
+
+    for (const result of results) {
+        if (result.status === 'fulfilled') {
+            const { account, orders } = result.value;
             state.pendingOrders[account.id] = orders;
             state.dataAt.pendingOrders[account.id] = nowMs();
-        } catch (err) {
-            console.error(`Failed to load pending orders for ${account.name}:`, err);
+        } else {
+            console.error('Failed to load pending orders:', result.reason);
         }
     }
     renderPendingOrdersTable();
@@ -1402,7 +1410,7 @@ function ordersNextPage() {
 }
 
 /**
- * 加载所有账户的订单（不支持分页，只加载第一页）
+ * 加载所有账户的订单（并发请求，不支持分页，只加载第一页）
  */
 async function loadAllAccountsOrders(options = {}) {
     const { preserveExisting = false } = options || {};
@@ -1419,20 +1427,29 @@ async function loadAllAccountsOrders(options = {}) {
     const allOrders = [];
 
     try {
-        for (const account of state.accounts) {
-            let url = `/api/accounts/${account.id}/orders?limit=50`;
-            if (startInput) {
-                url += `&start=${new Date(startInput).toISOString()}`;
-            }
-            if (endInput) {
-                url += `&end=${new Date(endInput).toISOString()}`;
-            }
+        const results = await Promise.allSettled(
+            state.accounts.map(async (account) => {
+                let url = `/api/accounts/${account.id}/orders?limit=50`;
+                if (startInput) {
+                    url += `&start=${new Date(startInput).toISOString()}`;
+                }
+                if (endInput) {
+                    url += `&end=${new Date(endInput).toISOString()}`;
+                }
+                const resp = await fetch(url);
+                const data = await resp.json();
+                return { account, items: data.items };
+            })
+        );
 
-            const resp = await fetch(url);
-            const data = await resp.json();
-
-            for (const order of data.items) {
-                allOrders.push({ ...order, accountName: account.name });
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { account, items } = result.value;
+                for (const order of items) {
+                    allOrders.push({ ...order, accountName: account.name });
+                }
+            } else {
+                console.error('Failed to load orders:', result.reason);
             }
         }
 
@@ -1564,7 +1581,7 @@ function billsNextPage() {
 }
 
 /**
- * 加载所有账户的账单（不支持分页，只加载第一页）
+ * 加载所有账户的账单（并发请求，不支持分页，只加载第一页）
  */
 async function loadAllAccountsBills(options = {}) {
     const { preserveExisting = false } = options || {};
@@ -1582,23 +1599,32 @@ async function loadAllAccountsBills(options = {}) {
     const allBills = [];
 
     try {
-        for (const account of state.accounts) {
-            let url = `/api/accounts/${account.id}/bills?limit=50`;
-            if (billType) {
-                url += `&bill_type=${billType}`;
-            }
-            if (startInput) {
-                url += `&start=${new Date(startInput).toISOString()}`;
-            }
-            if (endInput) {
-                url += `&end=${new Date(endInput).toISOString()}`;
-            }
+        const results = await Promise.allSettled(
+            state.accounts.map(async (account) => {
+                let url = `/api/accounts/${account.id}/bills?limit=50`;
+                if (billType) {
+                    url += `&bill_type=${billType}`;
+                }
+                if (startInput) {
+                    url += `&start=${new Date(startInput).toISOString()}`;
+                }
+                if (endInput) {
+                    url += `&end=${new Date(endInput).toISOString()}`;
+                }
+                const resp = await fetch(url);
+                const data = await resp.json();
+                return { account, items: data.items };
+            })
+        );
 
-            const resp = await fetch(url);
-            const data = await resp.json();
-
-            for (const bill of data.items) {
-                allBills.push({ ...bill, accountName: account.name });
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { account, items } = result.value;
+                for (const bill of items) {
+                    allBills.push({ ...bill, accountName: account.name });
+                }
+            } else {
+                console.error('Failed to load bills:', result.reason);
             }
         }
 
@@ -1843,15 +1869,9 @@ function renderBillsTable(bills, showAccountName = false) {
  * 加载历史仓位（支持分页）
  */
 async function loadPositionHistory(resetPage = true, options = {}) {
-    // 必须选择单个账户
+    // 全部账户模式
     if (state.currentAccountId === null) {
-        // 默认选择第一个账户
-        if (state.accounts.length > 0) {
-            const firstAccountId = state.accounts[0].id;
-            selectAccount(firstAccountId);
-            return;
-        }
-        alert('请先选择一个账户');
+        await loadAllAccountsPositionHistory(options);
         return;
     }
 
@@ -1923,6 +1943,78 @@ async function loadPositionHistory(resetPage = true, options = {}) {
 }
 
 /**
+ * 加载所有账户的历史仓位（并发请求，不支持分页，只加载第一页）
+ */
+async function loadAllAccountsPositionHistory(options = {}) {
+    const { preserveExisting = false } = options || {};
+    const startInput = document.getElementById('pos-history-start').value;
+    const endInput = document.getElementById('pos-history-end').value;
+    const instId = document.getElementById('pos-history-inst').value.trim();
+    const posSide = document.getElementById('pos-history-side').value;
+
+    elements.posHistoryLoading.classList.remove('hidden');
+    elements.noPosHistory.classList.add('hidden');
+    if (!preserveExisting) {
+        elements.posHistoryContainer.innerHTML = '';
+    }
+    elements.posHistoryPagination.classList.add('hidden');
+
+    const allPositions = [];
+
+    try {
+        const results = await Promise.allSettled(
+            state.accounts.map(async (account) => {
+                let url = `/api/accounts/${account.id}/positions-history?limit=50`;
+                if (startInput) {
+                    url += `&start=${new Date(startInput).toISOString()}`;
+                }
+                if (endInput) {
+                    url += `&end=${new Date(endInput).toISOString()}`;
+                }
+                if (instId) {
+                    url += `&inst_id=${encodeURIComponent(instId)}`;
+                }
+                if (posSide) {
+                    url += `&pos_side=${posSide}`;
+                }
+                const resp = await fetch(url);
+                const data = await resp.json();
+                return { account, items: data.items };
+            })
+        );
+
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { account, items } = result.value;
+                for (const pos of items) {
+                    allPositions.push({ ...pos, accountName: account.name });
+                }
+            } else {
+                console.error('Failed to load position history:', result.reason);
+            }
+        }
+
+        // 按平仓时间排序（updated_at 为平仓时间）
+        allPositions.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+        renderPositionHistoryCards(allPositions, true);
+
+        // 缓存（全部账户：无分页）
+        state.cache.posHistory[ACCOUNT_KEY_ALL] = {
+            items: allPositions,
+            hasMore: false,
+            lastId: null,
+            fetchedAt: nowMs(),
+            showAccountName: true,
+        };
+    } catch (err) {
+        console.error('Failed to load position history:', err);
+        elements.posHistoryContainer.innerHTML = `<div class="col-span-full text-center text-loss py-8">加载失败: ${err.message}</div>`;
+    } finally {
+        elements.posHistoryLoading.classList.add('hidden');
+    }
+}
+
+/**
  * 更新历史仓位分页控件状态
  */
 function updatePosHistoryPagination() {
@@ -1959,7 +2051,7 @@ function posHistoryNextPage() {
 /**
  * 渲染历史仓位卡片
  */
-function renderPositionHistoryCards(positions) {
+function renderPositionHistoryCards(positions, showAccountName = false) {
     if (positions.length === 0) {
         elements.posHistoryContainer.innerHTML = '';
         elements.noPosHistory.classList.remove('hidden');
@@ -1999,6 +2091,11 @@ function renderPositionHistoryCards(positions) {
         // 手续费 + 资金费
         const totalFee = (pos.fee || 0) + (pos.funding_fee || 0);
 
+        // 账户名标签
+        const accountNameHtml = showAccountName && pos.accountName
+            ? `<span class="px-2 py-0.5 rounded text-xs bg-accent/20 text-accent">${pos.accountName}</span>`
+            : '';
+
         html += `
             <div class="position-card relative bg-app-elevated rounded-xl p-4 border ${borderClass} hover:bg-app-surface transition-all">
                 <!-- 悬浮详情按钮 -->
@@ -2007,11 +2104,12 @@ function renderPositionHistoryCards(positions) {
                 </div>
                 <!-- 头部：合约名 + 方向 + 杠杆 -->
                 <div class="flex items-center justify-between mb-3 pr-12">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="font-mono text-sm font-semibold text-text-primary">${pos.inst_id}</span>
                         <span class="px-2 py-0.5 rounded text-xs font-semibold ${directionClass} ${directionBgClass}">
                             ${directionText}
                         </span>
+                        ${accountNameHtml}
                     </div>
                     <span class="text-xs text-text-muted font-mono">${pos.lever}x</span>
                 </div>
