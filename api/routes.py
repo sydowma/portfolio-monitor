@@ -31,6 +31,21 @@ class EquityCurveResponse(BaseModel):
     total_points: int = 0
 
 
+class CancelOrderRequest(BaseModel):
+    """取消订单请求"""
+    inst_id: str
+    order_id: str
+
+
+class CancelOrderResponse(BaseModel):
+    """取消订单响应"""
+    success: bool
+    inst_id: str
+    order_id: str
+    okx_s_code: Optional[str] = None
+    okx_s_msg: Optional[str] = None
+
+
 @router.get("/accounts", response_model=list[AccountInfo])
 async def list_accounts():
     """获取所有账户列表"""
@@ -82,6 +97,22 @@ async def get_pending_orders(account_id: str):
     client = OKXRestClient(account)
     try:
         return await client.get_pending_orders()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await client.close()
+
+
+@router.post("/accounts/{account_id}/cancel-order", response_model=CancelOrderResponse)
+async def cancel_order(account_id: str, req: CancelOrderRequest):
+    """取消指定账户的订单（在途订单）"""
+    account = get_account(account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    client = OKXRestClient(account)
+    try:
+        return await client.cancel_order(inst_id=req.inst_id, order_id=req.order_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

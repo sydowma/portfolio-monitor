@@ -51,7 +51,7 @@ class OKXRestClient:
 
         return headers
 
-    async def _request(self, method: str, path: str, params: dict = None) -> dict:
+    async def _request(self, method: str, path: str, params: Optional[dict] = None) -> list[dict]:
         """发送请求"""
         url = self.BASE_URL + path
         body = ""
@@ -279,6 +279,49 @@ class OKXRestClient:
             ))
 
         return orders
+
+    async def cancel_order(self, inst_id: str, order_id: str) -> dict:
+        """取消订单（挂单）
+
+        OKX 接口: POST /api/v5/trade/cancel-order
+        返回:
+          - success: 是否取消成功（以 data[0].sCode == "0" 判断）
+          - okx_s_code / okx_s_msg: OKX 子状态码与消息（即使 HTTP/顶层 code 成功也可能失败）
+        """
+        if not inst_id:
+            raise ValueError("inst_id is required")
+        if not order_id:
+            raise ValueError("order_id is required")
+
+        data = await self._request(
+            "POST",
+            "/api/v5/trade/cancel-order",
+            {"instId": inst_id, "ordId": order_id},
+        )
+
+        if not data:
+            return {
+                "success": False,
+                "inst_id": inst_id,
+                "order_id": order_id,
+                "okx_s_code": None,
+                "okx_s_msg": "Empty OKX response",
+            }
+
+        item = data[0]
+        s_code = item.get("sCode") or None
+        raw_s_msg = (item.get("sMsg") or "").strip()
+        s_msg = raw_s_msg or None
+        if s_code and s_code != "0" and not s_msg:
+            s_msg = f"OKX cancel failed (sCode={s_code})"
+
+        return {
+            "success": s_code == "0",
+            "inst_id": inst_id,
+            "order_id": item.get("ordId") or order_id,
+            "okx_s_code": s_code,
+            "okx_s_msg": s_msg,
+        }
 
     async def get_bills(
         self,

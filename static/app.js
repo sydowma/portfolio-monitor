@@ -11,6 +11,8 @@ const state = {
     balances: {},           // accountId -> balance
     positions: {},          // accountId -> positions[]
     pendingOrders: {},      // accountId -> pendingOrders[]
+    // 取消订单中的 key 集合: `${accountId}:${orderId}`
+    cancelingOrderKeys: new Set(),
     wsConnected: false,
     activeTab: 'positions',
     autoRefreshMs: 30 * 1000,
@@ -201,16 +203,16 @@ async function init() {
     connectWebSocket();
     await loadInitialData();
 
-    // 设置默认时间范围（最近7天）
+    // 设置默认时间范围
     const now = new Date();
+    const threeDaysAgo = new Date(now - 3 * 24 * 60 * 60 * 1000);
     const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-    const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
     document.getElementById('order-start').value = formatDateTimeLocal(weekAgo);
     document.getElementById('order-end').value = formatDateTimeLocal(now);
     document.getElementById('bill-start').value = formatDateTimeLocal(weekAgo);
     document.getElementById('bill-end').value = formatDateTimeLocal(now);
-    // 历史仓位默认查询最近30天
-    document.getElementById('pos-history-start').value = formatDateTimeLocal(monthAgo);
+    // 历史仓位默认查询最近3天
+    document.getElementById('pos-history-start').value = formatDateTimeLocal(threeDaysAgo);
     document.getElementById('pos-history-end').value = formatDateTimeLocal(now);
 }
 
@@ -1106,7 +1108,7 @@ async function loadPendingOrders(options = {}) {
         }
     } catch (err) {
         console.error('Failed to load pending orders:', err);
-        elements.pendingOrdersTable.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-loss">加载失败: ${err.message}</td></tr>`;
+        elements.pendingOrdersTable.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-loss">加载失败: ${err.message}</td></tr>`;
     } finally {
         elements.pendingOrdersLoading.classList.add('hidden');
     }
@@ -1148,7 +1150,7 @@ function renderPendingOrdersTable() {
             const account = state.accounts.find(a => a.id === accountId);
             const accountName = account ? account.name : accountId;
             for (const order of state.pendingOrders[accountId]) {
-                orders.push({ ...order, accountName });
+                orders.push({ ...order, accountId, accountName });
             }
         }
         // 按创建时间排序（新的在前）
@@ -1207,6 +1209,27 @@ function renderPendingOrdersTable() {
 
         // 状态颜色
         const stateClass = order.state === 'partially_filled' ? 'bg-accent/20 text-accent' : 'bg-app-elevated';
+
+        // 取消按钮状态
+        const accountId = showAccountName ? order.accountId : state.currentAccountId;
+        const cancelKey = `${accountId}:${order.order_id}`;
+        const isCanceling = state.cancelingOrderKeys.has(cancelKey);
+        const cancelIconHtml = isCanceling
+            ? `<span class="inline-block w-3 h-3 border-2 border-loss border-t-transparent rounded-full animate-spin"></span>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+               </svg>`;
+        const cancelBtnHtml = `
+            <button
+                class="w-7 h-7 flex items-center justify-center rounded-lg text-loss hover:text-loss hover:bg-loss/15 transition-all opacity-80 hover:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="取消订单"
+                ${isCanceling ? 'disabled' : ''}
+                onclick="event.stopPropagation(); cancelPendingOrder('${accountId}', '${order.inst_id}', '${order.order_id}')"
+            >
+                ${cancelIconHtml}
+            </button>
+        `;
 
         // 时间格式化（兼容 ISO 字符串和毫秒时间戳）
         let timeStr = '-';
@@ -1276,7 +1299,10 @@ function renderPendingOrdersTable() {
                 <td class="px-6 py-3.5">
                     <div class="flex items-center justify-between gap-2">
                         <span class="px-2 py-1 rounded-md text-xs font-medium ${stateClass}">${stateText}</span>
-                        ${detailBtnHtml('pendingOrder', order)}
+                        <div class="flex items-center gap-2">
+                            ${cancelBtnHtml}
+                            ${detailBtnHtml('pendingOrder', order)}
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -1304,6 +1330,68 @@ function renderPendingOrdersTable() {
     }
 
     elements.pendingOrdersTable.innerHTML = html;
+}
+
+/**
+ * 取消在途订单
+ */
+async function cancelPendingOrder(accountId, instId, orderId) {
+    if (!accountId) {
+        alert('缺少账户信息，无法取消订单');
+        return;
+    }
+    if (!instId || !orderId) {
+        alert('缺少订单信息，无法取消订单');
+        return;
+    }
+
+    const ok = confirm(`确认取消该订单？\n${instId}\nOrder ID: ${orderId}`);
+    if (!ok) return;
+
+    const key = `${accountId}:${orderId}`;
+    if (state.cancelingOrderKeys.has(key)) return;
+
+    state.cancelingOrderKeys.add(key);
+    renderPendingOrdersTable();
+
+    try {
+        const resp = await fetch(`/api/accounts/${accountId}/cancel-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inst_id: instId, order_id: orderId }),
+        });
+
+        let data = null;
+        try {
+            data = await resp.json();
+        } catch (_) {
+            data = null;
+        }
+
+        // 后端在异常情况下会返回 { detail: "..." }
+        if (!resp.ok) {
+            const msg = data && data.detail ? data.detail : `HTTP ${resp.status}`;
+            throw new Error(msg);
+        }
+
+        if (!data || !data.success) {
+            const msg = (data && (data.okx_s_msg || data.message)) || '取消失败';
+            throw new Error(msg);
+        }
+
+        // 乐观更新：先从本地列表移除，WS 会再做最终校准
+        const list = state.pendingOrders[accountId] || [];
+        state.pendingOrders[accountId] = list.filter((o) => o.order_id !== orderId);
+        state.dataAt.pendingOrders[accountId] = nowMs();
+        state.dataAt.pendingOrders[ACCOUNT_KEY_ALL] = nowMs();
+        renderPendingOrdersTable();
+    } catch (err) {
+        console.error('Failed to cancel order:', err);
+        alert(`取消失败: ${err && err.message ? err.message : err}`);
+    } finally {
+        state.cancelingOrderKeys.delete(key);
+        renderPendingOrdersTable();
+    }
 }
 
 /**
