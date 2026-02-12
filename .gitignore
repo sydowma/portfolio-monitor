@@ -13,3 +13,6 @@ wheels/
 
 # Cursor / local IDE artifacts
 .cursor/
+
+# Database files
+data/

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from config import ACCOUNTS, get_account
 from models import AccountInfo, Balance, Position, Order, Bill, AccountSummary, PaginatedOrders, PaginatedBills, PendingOrder, PositionHistory, PaginatedPositionHistory
 from okx import OKXRestClient
+from db import get_snapshots
 
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -337,13 +338,111 @@ def _aggregate_by_day(points: list[EquityCurvePoint]) -> list[EquityCurvePoint]:
     """按天聚合，取每天最后一个点"""
     if not points:
         return []
-    
+
     daily = {}
     for p in points:
         # 截取到天
         day_key = p.timestamp[:10]  # "2025-12-07"
         daily[day_key] = p
-    
+
+    return list(daily.values())
+
+
+class SnapshotPoint(BaseModel):
+    """快照数据点"""
+    timestamp: str
+    balance: float
+
+
+class SnapshotResponse(BaseModel):
+    """快照响应"""
+    points: list[SnapshotPoint]
+    start_balance: Optional[float] = None
+    end_balance: Optional[float] = None
+    total_points: int = 0
+    source: str = "snapshot"
+
+
+@router.get("/accounts/{account_id}/equity-curve-v2", response_model=SnapshotResponse)
+async def get_equity_curve_v2(
+    account_id: str,
+    days: int = Query(30, ge=1, le=365, description="查询天数，最多365天"),
+    interval: str = Query("raw", description="聚合间隔: raw/hourly/daily"),
+):
+    """
+    获取账户资产曲线数据（基于定时快照）
+    数据来源：每分钟定时打点的资产快照
+    """
+    account = get_account(account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    try:
+        end_time = datetime.now(timezone.utc)
+        start_time = end_time - timedelta(days=days)
+
+        # 从数据库获取快照数据
+        snapshots = await get_snapshots(
+            account_id=account_id,
+            start_time=int(start_time.timestamp() * 1000),
+            end_time=int(end_time.timestamp() * 1000),
+        )
+
+        if not snapshots:
+            return SnapshotResponse(points=[], total_points=0, source="snapshot")
+
+        # 构建数据点
+        points = []
+        for snapshot in snapshots:
+            points.append(SnapshotPoint(
+                timestamp=datetime.fromtimestamp(
+                    snapshot["timestamp"] / 1000, tz=timezone.utc
+                ).isoformat(),
+                balance=snapshot["total_equity"],
+            ))
+
+        # 按间隔聚合
+        if interval == "hourly":
+            points = _aggregate_snapshots_by_hour(points)
+        elif interval == "daily":
+            points = _aggregate_snapshots_by_day(points)
+
+        return SnapshotResponse(
+            points=points,
+            start_balance=points[0].balance if points else None,
+            end_balance=points[-1].balance if points else None,
+            total_points=len(points),
+            source="snapshot",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _aggregate_snapshots_by_hour(points: list[SnapshotPoint]) -> list[SnapshotPoint]:
+    """按小时聚合，取每小时最后一个点"""
+    if not points:
+        return []
+
+    hourly = {}
+    for p in points:
+        # 截取到小时
+        hour_key = p.timestamp[:13]  # "2025-12-07T09"
+        hourly[hour_key] = p
+
+    return list(hourly.values())
+
+
+def _aggregate_snapshots_by_day(points: list[SnapshotPoint]) -> list[SnapshotPoint]:
+    """按天聚合，取每天最后一个点"""
+    if not points:
+        return []
+
+    daily = {}
+    for p in points:
+        # 截取到天
+        day_key = p.timestamp[:10]  # "2025-12-07"
+        daily[day_key] = p
+
     return list(daily.values())
 
 

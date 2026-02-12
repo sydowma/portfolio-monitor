@@ -2328,7 +2328,7 @@ async function loadEquityCurve(options = {}) {
     }
 
     try {
-        const url = `/api/accounts/${state.currentAccountId}/equity-curve?days=${days}&interval=${interval}`;
+        const url = `/api/accounts/${state.currentAccountId}/equity-curve-v2?days=${days}&interval=${interval}`;
         const resp = await fetch(url);
         const data = await resp.json();
 

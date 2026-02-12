@@ -11,6 +11,8 @@ from fastapi.responses import FileResponse
 from api import router, WebSocketManager
 from api.websocket import ws_manager
 from config import ACCOUNTS
+from db import get_db, close_db
+from scheduler import start_scheduler, stop_scheduler
 
 
 @asynccontextmanager
@@ -18,10 +20,22 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     print(f"Starting Portfolio Monitor with {len(ACCOUNTS)} accounts...")
 
+    # 初始化数据库连接
+    await get_db()
+
+    # 启动快照定时任务
+    start_scheduler()
+
     # 启动 OKX WebSocket 连接
     await ws_manager.start_okx_connections()
 
     yield
+
+    # 停止快照定时任务
+    stop_scheduler()
+
+    # 关闭数据库连接
+    await close_db()
 
     # 停止 OKX WebSocket 连接
     print("Shutting down OKX connections...")
@@ -70,7 +84,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8080,
+        port=9001,
         reload=True,
     )
 
