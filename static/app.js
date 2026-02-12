@@ -2205,6 +2205,7 @@ function renderPositionHistoryCards(positions, showAccountName = false) {
                 <!-- 时间信息 -->
                 <div class="flex justify-between text-xs text-text-muted mb-3">
                     <span>开仓: ${openTime}</span>
+                    <span>平仓: ${closeTime}</span>
                     <span>持仓: ${duration}</span>
                 </div>
 
@@ -2245,10 +2246,6 @@ function renderPositionHistoryCards(positions, showAccountName = false) {
                     <!-- 收益率进度条 -->
                     <div class="h-1.5 bg-app-surface rounded-full overflow-hidden">
                         <div class="h-full ${progressColor} rounded-full transition-all" style="width: ${progressPercent}%"></div>
-                    </div>
-                    <!-- 平仓时间 -->
-                    <div class="text-xs text-text-muted mt-2 text-right">
-                        平仓: ${closeTime}
                     </div>
                 </div>
             </div>
